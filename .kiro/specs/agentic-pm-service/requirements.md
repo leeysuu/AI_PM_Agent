@@ -132,12 +132,12 @@
 
 #### Acceptance Criteria
 
-1. WHEN 팀원이 결과물을 제출하면, THE AI_Quality_Reviewer SHALL 단일 Bedrock Claude API 호출로 4단계 연쇄 처리를 수행한다: (1) 완성도, 논리성, 분량, 주제적합성 각 25점 기준 품질 평가, (2) 리뷰 점수 기반 진행률 자동 산정, (3) Expected_Progress와 Actual_Progress 비교를 통한 지연 감지, (4) 지연이 critical일 때 재배분 제안 생성
-2. WHEN 품질 리뷰가 완료되면, THE AI_Quality_Reviewer SHALL 각 평가 항목별 점수(0~25점)와 총점(0~100점), 구체적 개선 포인트 피드백을 제공한다
-3. WHEN 품질 리뷰가 완료되면, THE AI_Quality_Reviewer SHALL 총점 기반으로 진행률을 자동 산정한다 (80점 이상: 90~100%, 60~79점: 60~89%, 40~59점: 30~59%, 40점 미만: 0~29%)
-4. WHEN 진행률이 산정되면, THE AI_Delay_Detector SHALL Expected_Progress와 Actual_Progress의 갭을 계산하여 severity를 판정한다 (갭 20% 이상: critical, 갭 10~19%: warning, 갭 10% 미만: normal)
-5. WHEN severity가 critical로 판정되면, THE AI_Delay_Detector SHALL 팀 전체 상황을 분석하여 재배분 제안을 자동 생성하고 Suggestion_Panel에 카드로 표시한다
-6. WHEN 연쇄 처리가 완료되면, THE System SHALL 리뷰 결과, 진행률, 지연 분석, 재배분 제안을 한번에 Dashboard에 표시한다
+1. WHEN 팀원이 결과물을 제출하면, THE System SHALL 팀원의 추가 조작 없이 단일 Bedrock Claude API 호출로 4단계 연쇄 처리를 자동 실행한다: STEP 1) 완성도, 논리성, 분량, 주제적합성 각 25점 기준 품질 평가 → STEP 2) 리뷰 점수 기반 진행률 자동 산정 → STEP 3) Expected_Progress와 Actual_Progress 비교를 통한 지연 감지 → STEP 4) 지연이 critical일 때 재배분 제안 생성. 이 4단계는 하나의 API 호출(POST /api/review)에서 중단 없이 순차적으로 자동 실행되며, 각 단계의 출력이 다음 단계의 입력으로 사용된다
+2. WHEN 품질 리뷰가 완료되면, THE AI_Quality_Reviewer SHALL Bedrock Claude의 동적 판단을 통해 각 평가 항목별 점수(0~25점)와 총점(0~100점), 구체적 개선 포인트 피드백을 제공한다 (하드코딩된 채점 기준 없이 AI가 매번 결과물 내용을 분석하여 점수를 산정한다)
+3. WHEN 품질 리뷰가 완료되면, THE AI_Quality_Reviewer SHALL Bedrock Claude의 동적 판단을 통해 총점 기반으로 진행률을 자동 산정한다 (80점 이상: 90~100%, 60~79점: 60~89%, 40~59점: 30~59%, 40점 미만: 0~29% 범위 내에서 AI가 자율적으로 구체적 수치를 결정한다)
+4. WHEN 진행률이 산정되면, THE AI_Delay_Detector SHALL Bedrock Claude의 동적 판단을 통해 Expected_Progress와 Actual_Progress의 갭을 계산하여 severity를 판정한다 (갭 20% 이상: critical, 갭 10~19%: warning, 갭 10% 미만: normal)
+5. WHEN severity가 critical로 판정되면, THE AI_Delay_Detector SHALL Bedrock Claude의 동적 판단을 통해 팀 전체 상황(팀원 부하, 강점, 마감일 근접도)을 분석하여 재배분 제안을 자율적으로 생성하고 Suggestion_Panel에 카드로 표시한다
+6. WHEN 연쇄 처리가 완료되면, THE System SHALL 리뷰 결과, 진행률, 지연 분석, 재배분 제안을 한번에 Dashboard에 표시한다. 팀원은 결과물 텍스트만 제출하면 나머지 4단계는 전부 AI가 자동으로 처리한다
 
 ### Requirement 10: AI 제안 수락/거절
 
@@ -190,12 +190,12 @@
 
 #### Acceptance Criteria
 
-1. WHEN 태스크의 마지막 업데이트로부터 3일 이상 경과하면, THE AI_Proactive_Checker SHALL 해당 팀원에게 독촉 메시지를 Team_Chat에 자동 전송한다
-2. WHEN 전체 마감일 3일 전(D-3)이 되면, THE AI_Proactive_Checker SHALL 팀 전체에 중간 점검 알림을 생성한다
-3. WHEN 전체 마감일 1일 전(D-1)이 되면, THE AI_Proactive_Checker SHALL 팀 전체에 긴급 알림을 생성한다
-4. WHEN 개별 태스크가 완료되면, THE AI_Proactive_Checker SHALL 축하 메시지와 함께 팀 전체 진행률 업데이트를 Team_Chat에 공유한다
+1. WHEN 태스크의 마지막 업데이트로부터 3일 이상 경과하면, THE AI_Proactive_Checker SHALL Bedrock Claude API를 호출하여 해당 팀원의 상황을 동적으로 분석하고, 상황에 맞는 독촉 메시지를 생성하여 Team_Chat에 자동 전송한다 (하드코딩된 메시지 템플릿이 아닌 AI가 매번 상황에 맞게 메시지를 생성한다)
+2. WHEN 전체 마감일 3일 전(D-3)이 되면, THE AI_Proactive_Checker SHALL Bedrock Claude API를 호출하여 현재 팀 전체 진행 상황을 동적으로 분석하고, 중간 점검 알림을 생성한다
+3. WHEN 전체 마감일 1일 전(D-1)이 되면, THE AI_Proactive_Checker SHALL Bedrock Claude API를 호출하여 미완료 태스크와 팀 상황을 동적으로 분석하고, 긴급 알림을 생성한다
+4. WHEN 개별 태스크가 완료되면, THE AI_Proactive_Checker SHALL Bedrock Claude API를 호출하여 팀 전체 진행률과 남은 태스크를 동적으로 분석하고, 축하 메시지와 함께 진행률 업데이트를 Team_Chat에 공유한다
 5. WHEN 모든 태스크가 완료 상태가 되면, THE AI_Proactive_Checker SHALL 보고서 취합 트리거 신호를 생성한다
-6. THE AI_Proactive_Checker SHALL GET /api/check 엔드포인트를 통해 주기적으로 점검을 수행한다
+6. THE AI_Proactive_Checker SHALL GET /api/check 엔드포인트를 통해 Bedrock Claude API를 호출하여 주기적으로 점검을 수행한다. 모든 점검 판단은 하드코딩 분기 없이 AI가 현재 Team_State를 분석하여 동적으로 수행한다
 
 ### Requirement 15: 과제 마켓플레이스
 
@@ -204,8 +204,8 @@
 #### Acceptance Criteria
 
 1. WHEN 프로젝트가 종료되면(보고서 승인 완료), THE System SHALL "이 과제를 마켓에 등록하시겠습니까?" 팝업을 표시한다
-2. WHEN 팀원이 마켓 등록을 승인하면, THE System SHALL Bedrock Claude API를 호출하여 최종 품질 리뷰 점수 기반으로 판매 가격을 자동 제안한다
-3. WHEN 마켓 등록이 진행되면, THE System SHALL Bedrock Claude API를 호출하여 맛보기 요약본을 자동 생성하고 전체 본문은 비공개로 유지한다
+2. WHEN 팀원이 마켓 등록을 승인하면, THE System SHALL Bedrock Claude API를 호출하여 최종 품질 리뷰 점수, 과제 주제, 분량, 완성도를 종합적으로 분석하고 판매 가격을 AI가 자율적으로 산정하여 제안한다 (하드코딩된 가격 테이블이 아닌 AI가 매번 과제의 가치를 동적으로 판단한다). 예: "이 과제는 품질 점수 85점입니다. 5,000원의 가치로 산정합니다. 등록할까요?"
+3. WHEN 마켓 등록이 진행되면, THE System SHALL Bedrock Claude API를 호출하여 과제 내용을 동적으로 분석하고 맛보기 요약본을 AI가 자율적으로 생성한다. 전체 본문은 비공개로 유지한다
 4. THE Marketplace SHALL 과목별, 학과별 카테고리 필터 기능을 제공한다
 5. THE Marketplace SHALL 인기 과제 랭킹을 품질 점수 순으로 표시한다
 6. THE Marketplace SHALL 각 과제 카드에 제목, 과목명, 품질 점수, 가격, AI 요약 미리보기를 표시한다
