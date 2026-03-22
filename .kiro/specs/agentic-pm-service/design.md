@@ -66,16 +66,41 @@ graph TB
 
 ### 핵심 데이터 흐름
 
+#### 데이터 영속성 흐름 (React Context + localStorage 전용)
+
+모든 데이터는 React Context + useReducer로 전역 관리되며, DB 없이 localStorage만 사용한다. Context 상태가 변경될 때마다 localStorage에 자동 동기화되고, 앱 로드 시 localStorage에서 자동 복원된다.
+
+```mermaid
+graph LR
+    subgraph "React 앱 (브라우저)"
+        UI[UI 컴포넌트] -->|dispatch 액션| CTX[TeamContext<br/>useReducer]
+        CTX -->|상태 구독| UI
+        CTX -->|변경 시 자동 저장| LS[localStorage<br/>ai-pm-agent-team<br/>ai-pm-agent-market]
+        LS -->|앱 로드 시 자동 복원| CTX
+    end
+
+    subgraph "AWS Lambda"
+        API[API 엔드포인트] -->|Bedrock 호출| BR[Bedrock Claude]
+    end
+
+    UI -->|fetch POST/GET| API
+    API -->|JSON 응답| UI
+    
+    Note1[DB 없음 — localStorage만 사용<br/>해커톤 MVP]
+```
+
+#### 팀 생성 흐름
+
 ```mermaid
 sequenceDiagram
     participant U as 팀원
     participant FE as React 프론트엔드
     participant CTX as Context + Reducer
+    participant LS as localStorage
     participant API as API Gateway
     participant LM as Lambda
     participant BR as Bedrock Claude
 
-    Note over U,BR: 1. 팀 생성 흐름
     U->>FE: 팀 정보 입력 + 제출
     FE->>API: POST /api/team
     API->>LM: 역할분배 + 일정생성
@@ -83,24 +108,43 @@ sequenceDiagram
     BR-->>LM: JSON (tasks + milestones)
     LM-->>FE: 응답
     FE->>CTX: dispatch(SET_TEAM)
+    CTX->>LS: 자동 저장 (ai-pm-agent-team)
     CTX->>FE: 칸반보드 렌더링
+```
 
-    Note over U,BR: 2. 결과물 제출 연쇄 흐름
-    U->>FE: 결과물 텍스트 제출
-    FE->>API: POST /api/review
-    API->>LM: 4단계 연쇄 처리
-    LM->>BR: 단일 호출 (STEP 1-4)
-    BR-->>LM: JSON (리뷰 + 진행률 + 지연감지 + 재배분)
+#### 채팅방 흐름 (웹소켓 없이 React State + POST 호출)
+
+채팅방은 웹소켓을 사용하지 않는다. 팀원이 메시지를 전송하면 React State에 즉시 추가하고, POST /api/chat을 호출하여 AI 분석 결과를 받아 다시 State에 반영한다. 모든 채팅 데이터는 Context를 통해 localStorage에 자동 저장된다.
+
+```mermaid
+sequenceDiagram
+    participant U as 팀원
+    participant FE as React 프론트엔드
+    participant CTX as Context + Reducer
+    participant LS as localStorage
+    participant API as API Gateway
+    participant LM as Lambda
+    participant BR as Bedrock Claude
+
+    Note over U,BR: 웹소켓 없음 — React State + POST 호출 방식
+    U->>FE: 메시지 입력 + 전송
+    FE->>CTX: dispatch(ADD_MESSAGE) — 즉시 채팅 목록에 표시
+    CTX->>LS: 자동 저장
+    FE->>API: POST /api/chat {teamState, newMessage, sender}
+    API->>LM: 대화 분석
+    LM->>BR: 프롬프트 (최근 20개 메시지 + Team_State)
+    BR-->>LM: JSON {detection, shouldIntervene, aiResponse}
     LM-->>FE: 응답
-    FE->>CTX: dispatch(UPDATE_REVIEW)
 
-    Note over U,BR: 3. 자율 협상 루프
-    U->>FE: 제안 거절 + 사유 입력
-    FE->>API: POST /api/decision
-    API->>LM: 대안 생성
-    LM->>BR: 프롬프트 (이전 이력 포함)
-    BR-->>LM: JSON (새 대안)
-    LM-->>FE: 새 제안 카드
+    alt shouldIntervene === true (confidence ≥ 0.7)
+        FE->>CTX: dispatch(ADD_MESSAGE, sender: 'ai') — AI 봇 메시지 추가
+        CTX->>LS: 자동 저장
+        CTX->>FE: 채팅 목록에 AI 메시지 표시 (시각적 구분)
+    else confidence < 0.7
+        FE->>FE: 사이드바에만 감지 결과 요약 표시
+    else 감지 없음
+        Note over FE: AI 응답 없음 (불필요한 개입 방지)
+    end
 ```
 
 ### 연쇄 실행 아키텍처
@@ -110,6 +154,138 @@ sequenceDiagram
 1. **결과물 제출 연쇄** (POST /api/review): 품질 리뷰 → 진행률 산정 → 지연 감지 → 재배분 제안을 단일 Bedrock 호출로 처리
 2. **보고서 연쇄** (POST /api/merge): 전원 완료 감지 → 보고서 병합 → PPT 생성
 3. **협상 루프** (POST /api/decision): 제안 → 수락/거절 → 대안 생성 (최대 3회)
+
+#### 결과물 제출 4단계 연쇄 상세 흐름
+
+팀원이 결과물 텍스트를 제출하면, 단일 POST /api/review 호출 내에서 Lambda가 하나의 Bedrock 프롬프트로 4단계를 순차 실행한다. 각 단계의 출력이 다음 단계의 입력으로 사용되며, 팀원의 추가 조작 없이 전부 자동으로 처리된다.
+
+```mermaid
+sequenceDiagram
+    participant U as 팀원
+    participant FE as React 프론트엔드
+    participant CTX as Context + localStorage
+    participant API as API Gateway
+    participant LM as Lambda (POST /api/review)
+    participant BR as Bedrock Claude
+
+    U->>FE: 결과물 텍스트 제출
+    FE->>FE: 빈 텍스트 검증 (빈 값 차단)
+    FE->>CTX: dispatch(UPDATE_TASK, status: inProgress)
+    FE->>API: POST /api/review {teamState, taskId, content}
+    API->>LM: 요청 전달
+
+    Note over LM,BR: 단일 Bedrock 호출로 4단계 연쇄 실행
+    LM->>LM: 프롬프트 구성 (STEP 1~4 명시 + Team_State 전체 포함)
+    LM->>BR: 단일 프롬프트 전송
+
+    Note over BR: STEP 1: 품질 리뷰
+    Note over BR: 완성도/논리성/분량/주제적합성 각 25점 채점
+    Note over BR: STEP 2: 진행률 자동 산정
+    Note over BR: STEP 1 점수 기반으로 진행률 결정
+    Note over BR: STEP 3: 지연 감지
+    Note over BR: 기대진행률 vs STEP 2 실제진행률 갭 계산
+    Note over BR: STEP 4: 재배분 제안 (critical일 때만)
+    Note over BR: STEP 3에서 갭≥20% 시 팀 상황 분석→재배분 생성
+
+    BR-->>LM: JSON {review, delayDetection, reassignSuggestion}
+    LM->>LM: JSON 파싱 (코드블록 래핑 제거 + 실패 시 1회 재시도)
+    LM-->>API: 응답
+    API-->>FE: 4단계 결과 한번에 수신
+
+    FE->>CTX: dispatch(UPDATE_REVIEW) — 리뷰 점수 + 진행률 반영
+    CTX->>FE: 칸반보드 태스크 카드 업데이트 (진행률 바 + 상태 뱃지)
+
+    alt severity === critical (재배분 제안 있음)
+        FE->>CTX: dispatch(ADD_SUGGESTION) — 재배분 제안 카드 추가
+        CTX->>FE: Suggestion Panel에 제안 카드 표시
+    end
+
+    CTX->>CTX: localStorage 자동 저장 (ai-pm-agent-team)
+```
+
+#### 보고서 취합 + PPT 연쇄 흐름
+
+```mermaid
+sequenceDiagram
+    participant FE as React 프론트엔드
+    participant CTX as Context + localStorage
+    participant API as API Gateway
+    participant LM as Lambda
+    participant BR as Bedrock Claude
+
+    Note over FE,BR: 전원 태스크 완료 감지 → 보고서 병합 → PPT 생성
+    FE->>API: GET /api/check {teamState}
+    API->>LM: 자동 점검
+    LM->>BR: 팀 상태 분석
+    BR-->>LM: {triggerMerge: true}
+    LM-->>FE: 보고서 병합 트리거
+
+    FE->>API: POST /api/merge {teamState}
+    API->>LM: 보고서 병합 + PPT 생성
+    LM->>BR: 단일 프롬프트 (결과물 병합 + 슬라이드 구성)
+    BR-->>LM: JSON {report, pptSlides}
+    LM-->>FE: 응답
+
+    FE->>CTX: dispatch(SET_REPORT) — 보고서 저장
+    CTX->>FE: Report Viewer에 미리보기 표시
+
+    alt 팀원이 승인 클릭
+        FE->>CTX: dispatch(APPROVE_REPORT)
+        FE->>CTX: dispatch(SET_PPT_SLIDES) — PPT 저장
+        CTX->>FE: PPT Viewer에 reveal.js 프레젠테이션 표시
+    else 팀원이 수정 요청
+        FE->>API: POST /api/merge {teamState + feedback}
+        Note over LM,BR: 피드백 반영하여 보고서 재생성
+    end
+
+    CTX->>CTX: localStorage 자동 저장
+```
+
+#### 자율 협상 루프 흐름
+
+```mermaid
+sequenceDiagram
+    participant U as 팀원
+    participant FE as React 프론트엔드
+    participant CTX as Context + localStorage
+    participant API as API Gateway
+    participant LM as Lambda
+    participant BR as Bedrock Claude
+
+    Note over U,BR: 최대 3회 대안 생성 루프
+    U->>FE: 제안 거절 + 사유 입력
+    FE->>FE: 빈 사유 검증 (빈 값 차단)
+
+    loop round 1~3 (거절 시마다 반복)
+        FE->>API: POST /api/decision {teamState, suggestionId, rejected, reason}
+        API->>LM: 대안 생성 요청
+        LM->>LM: 프롬프트 구성 (이전 제안 이력 전체 포함 — 반복 방지)
+        LM->>BR: Bedrock 호출
+        BR-->>LM: JSON {newSuggestion}
+        LM-->>FE: 새 대안
+
+        FE->>CTX: dispatch(UPDATE_SUGGESTION, rejected)
+        FE->>CTX: dispatch(ADD_SUGGESTION, newSuggestion)
+        CTX->>FE: Suggestion Panel 업데이트
+
+        alt 팀원이 수락
+            FE->>API: POST /api/decision {accepted: true}
+            API->>LM: 변경사항 적용
+            LM-->>FE: {appliedChanges}
+            FE->>CTX: dispatch(APPLY_CHANGES)
+            Note over FE: 루프 종료
+        else 팀원이 다시 거절 + 사유
+            Note over FE: 다음 라운드로 계속
+        end
+    end
+
+    alt round > 3
+        FE->>FE: "팀원 간 직접 논의를 권장합니다" 안내 표시
+        Note over FE: AI 자동 제안 중단
+    end
+
+    CTX->>CTX: localStorage 자동 저장
+```
 
 
 ## Components and Interfaces
