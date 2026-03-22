@@ -54,8 +54,8 @@ MVP 우선순위에 따라 핵심 기능부터 점진적으로 구현한다. 프
 - [ ] 2. Checkpoint - 프로젝트 기반 구조 확인
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 3. [1순위] 팀 생성 + AI 역할 분배 + AI 일정 생성
-  - [ ] 3.1 팀 생성 폼 컴포넌트 구현
+- [x] 3. [1순위] 팀 생성 + AI 역할 분배 + AI 일정 생성
+  - [x] 3.1 팀 생성 폼 컴포넌트 구현
     - `src/components/team/TeamCreatePage.tsx`: 팀 생성 페이지 컨테이너
     - `src/components/team/ProjectInfoForm.tsx`: 프로젝트명, 마감일 입력 필드
     - `src/components/team/MemberAddForm.tsx`: 팀원 이름/학과/강점 입력 + 추가 버튼
@@ -63,32 +63,32 @@ MVP 우선순위에 따라 핵심 기능부터 점진적으로 구현한다. 프
     - 유효성 검증: 필수 필드 누락 시 시각적 표시 + 제출 차단, 마감일 과거 날짜 차단, 최소 2명 팀원 필수
     - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-  - [ ] 3.2 useTeam 커스텀 훅 구현 (`src/hooks/useTeam.ts`)
+  - [x] 3.2 useTeam 커스텀 훅 구현 (`src/hooks/useTeam.ts`)
     - `createTeam(input)`: POST /api/team 호출 → 응답으로 tasks, milestones 받아 SET_TEAM dispatch
     - `updateTaskProgress(taskId, progress)`: UPDATE_TASK dispatch
     - `applyChanges(changes)`: APPLY_CHANGES dispatch
     - 로딩/에러 상태 관리
     - _Requirements: 2.1, 2.2, 2.3, 3.1, 3.2, 3.3_
 
-  - [ ] 3.3 POST /api/team Lambda 함수 구현
+  - [x] 3.3 POST /api/team Lambda 함수 구현
     - 입력: projectName, topic, deadline, members[]
     - Bedrock Claude 프롬프트 구성: 팀원 강점 + 주제 분석 → 5~8개 태스크 생성, 담당자 배정 + 배정 이유, 난이도 산정, 마감일 역산 마일스톤 생성
     - JSON 응답 파싱 (코드블록 래핑 제거 포함)
     - 실패 시 1회 재시도, 재시도 실패 시 500 에러 반환
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 17.1, 17.2, 17.3, 17.5_
 
-  - [ ] 3.4 Bedrock 호출 공통 레이어 구현 (Lambda 공유 모듈)
+  - [x] 3.4 Bedrock 호출 공통 레이어 구현 (Lambda 공유 모듈)
     - `invokeBedrock(prompt)`: BedrockRuntimeClient + InvokeModelCommand
     - `parseAIResponse(raw)`: Bedrock 응답 구조 파싱 + JSON 코드블록 제거
     - 모델 ID: `anthropic.claude-3-5-sonnet-20241022-v2:0`
     - _Requirements: 17.1, 17.5, 19.3_
 
-  - [ ] 3.5 팀 생성 완료 후 대시보드 전환 연동
+  - [x] 3.5 팀 생성 완료 후 대시보드 전환 연동
     - 팀 생성 성공 시 대시보드 탭으로 자동 전환
     - SET_TEAM dispatch 후 칸반보드에 태스크 표시
     - _Requirements: 3.4_
 
-  - [ ] 3.6 팀 생성 폼 유효성 검증 단위 테스트
+  - [x] 3.6 팀 생성 폼 유효성 검증 단위 테스트
     - 필수 필드 누락 시 제출 차단 테스트
     - 과거 마감일 차단 테스트
     - 팀원 2명 미만 차단 테스트
@@ -123,18 +123,18 @@ MVP 우선순위에 따라 핵심 기능부터 점진적으로 구현한다. 프
     - AI 감지 confidence 기반 개입/비개입 분기 테스트
     - _Requirements: 6.3, 7.5, 7.6_
 
-- [ ] 5. [3순위] 결과물 제출 → 품질 리뷰 → 진행률 → 지연 감지 (연쇄 처리)
-  - [ ] 5.1 결과물 제출 UI 구현
+- [x] 5. [3순위] 결과물 제출 → 품질 리뷰 → 진행률 → 지연 감지 (연쇄 처리)
+  - [x] 5.1 결과물 제출 UI 구현
     - `src/components/review/WorkSubmitModal.tsx`: 태스크 카드에서 열리는 결과물 텍스트 입력 모달
     - 빈 텍스트 제출 차단 + 에러 메시지 표시
     - 제출 시 태스크 상태를 inProgress로 변경
     - _Requirements: 8.1, 8.2, 8.3_
 
-  - [ ] 5.2 AI 리뷰 결과 표시 컴포넌트 구현
+  - [x] 5.2 AI 리뷰 결과 표시 컴포넌트 구현
     - `src/components/review/ReviewResult.tsx`: 4가지 항목별 점수 (0~25), 총점 (0~100), 개선 포인트 피드백, 진행률, 지연 severity 표시
     - _Requirements: 9.2, 9.3, 9.6_
 
-  - [ ] 5.3 POST /api/review Lambda 함수 구현 (4단계 연쇄 처리)
+  - [x] 5.3 POST /api/review Lambda 함수 구현 (4단계 연쇄 처리)
     - 단일 Bedrock 호출로 STEP 1~4 처리:
       - STEP 1: 완성도/논리성/분량/주제적합성 각 25점 채점
       - STEP 2: 총점 기반 진행률 산정 (80+→90-100%, 60-79→60-89%, 40-59→30-59%, <40→0-29%)
@@ -142,13 +142,13 @@ MVP 우선순위에 따라 핵심 기능부터 점진적으로 구현한다. 프
       - STEP 4: critical일 때 팀 전체 상황 분석 → 재배분 제안 생성
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 17.1, 17.2, 17.3_
 
-  - [ ] 5.4 리뷰 결과 → 대시보드 연동
+  - [x] 5.4 리뷰 결과 → 대시보드 연동
     - UPDATE_REVIEW dispatch: 태스크 리뷰 결과 + 진행률 업데이트
     - 재배분 제안 있을 시 ADD_SUGGESTION dispatch → Suggestion Panel에 카드 표시
     - 칸반보드 태스크 카드에 진행률 바 + 상태 뱃지 반영
     - _Requirements: 9.6, 5.2, 5.3_
 
-  - [ ] 5.5 연쇄 처리 응답 파싱 및 상태 업데이트 단위 테스트
+  - [x] 5.5 연쇄 처리 응답 파싱 및 상태 업데이트 단위 테스트
     - 리뷰 점수 기반 진행률 산정 로직 테스트
     - severity 판정 로직 테스트
     - _Requirements: 9.3, 9.4_
@@ -204,24 +204,24 @@ MVP 우선순위에 따라 핵심 기능부터 점진적으로 구현한다. 프
 - [ ] 8. Checkpoint - 핵심 MVP 기능 통합 확인
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 9. [6순위] 보고서 자동 취합
-  - [ ] 9.1 보고서 뷰어 UI 구현
+- [x] 9. [6순위] 보고서 자동 취합
+  - [x] 9.1 보고서 뷰어 UI 구현
     - `src/components/report/ReportPage.tsx`: 보고서 페이지 컨테이너
     - `src/components/report/ReportViewer.tsx`: 마크다운 형식 보고서 미리보기 + 승인/수정 요청 버튼 + 수정 피드백 입력
     - _Requirements: 12.3, 12.4_
 
-  - [ ] 9.2 POST /api/merge Lambda 함수 구현 (보고서 병합)
+  - [x] 9.2 POST /api/merge Lambda 함수 구현 (보고서 병합)
     - Bedrock 호출: 전원 결과물 → 논리적 목차 구조 생성, 섹션 배치, 연결 문장 추가, 문체 통일
     - 응답: report{title, sections[]} + pptSlides[]
     - _Requirements: 12.1, 12.2, 17.1, 17.2_
 
-  - [ ] 9.3 보고서 병합 트리거 연동
+  - [x] 9.3 보고서 병합 트리거 연동
     - 전원 태스크 완료 감지 시 자동 병합 제안 표시
     - SET_REPORT dispatch → ReportViewer에 표시
     - 수정 요청 시 피드백 포함하여 POST /api/merge 재호출
     - _Requirements: 12.1, 12.3, 12.4_
 
-  - [ ] 9.4 보고서 병합 응답 파싱 단위 테스트
+  - [x] 9.4 보고서 병합 응답 파싱 단위 테스트
     - 섹션 구조 검증 테스트
     - _Requirements: 12.2_
 
@@ -271,20 +271,20 @@ MVP 우선순위에 따라 핵심 기능부터 점진적으로 구현한다. 프
     - reveal.js HTML 구조 검증 테스트
     - _Requirements: 13.2, 13.3_
 
-- [ ] 13. [9순위] AI 능동적 알림
-  - [ ] 13.1 GET /api/check Lambda 함수 구현
+- [x] 13. [9순위] AI 능동적 알림
+  - [x] 13.1 GET /api/check Lambda 함수 구현
     - Bedrock 호출: 마감 임박(D-3, D-1), 3일 이상 미업데이트 태스크, 전원 완료 여부 점검
     - 응답: alerts[], triggerMerge(boolean), aiChatMessage
     - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6, 17.1_
 
-  - [ ] 13.2 능동적 알림 프론트엔드 연동
+  - [x] 13.2 능동적 알림 프론트엔드 연동
     - checkApi.runCheck() 호출 (수동 트리거 또는 페이지 로드 시)
     - ADD_ALERT dispatch → AlertTimeline에 표시
     - triggerMerge=true 시 보고서 병합 플로우 트리거
     - 독촉/축하 메시지 → Team_Chat에 AI 메시지로 추가
     - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5_
 
-  - [ ] 13.3 알림 생성 및 표시 단위 테스트
+  - [x] 13.3 알림 생성 및 표시 단위 테스트
     - 알림 타입별 표시 테스트
     - _Requirements: 14.1, 14.2, 14.3_
 

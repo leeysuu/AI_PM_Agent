@@ -3,6 +3,7 @@ import { apiPost } from './apiClient';
 
 interface MergeReportInput {
   teamState: Team;
+  feedback?: string;
 }
 
 interface MergeReportResponse {
