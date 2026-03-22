@@ -271,7 +271,7 @@ MVP 우선순위에 따라 핵심 기능부터 점진적으로 구현한다. 프
     - reveal.js HTML 구조 검증 테스트
     - _Requirements: 13.2, 13.3_
 
-- [x] 13. [9순위] AI 능동적 알림
+- [-] 13. [9순위] AI 능동적 알림
   - [x] 13.1 GET /api/check Lambda 함수 구현
     - Bedrock 호출: 마감 임박(D-3, D-1), 3일 이상 미업데이트 태스크, 전원 완료 여부 점검
     - 응답: alerts[], triggerMerge(boolean), aiChatMessage

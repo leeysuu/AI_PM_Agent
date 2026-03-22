@@ -918,6 +918,65 @@ interface MarketListing {
 }
 ```
 
+### 포인트 시스템 모델
+
+```typescript
+interface PointAccount {
+  memberId: string;
+  memberName: string;
+  balance: number;               // 현재 포인트 잔액
+  deposit: number;               // 보증금 (프로젝트 시작 시 20pt)
+  history: PointHistory[];       // 포인트 변동 이력
+  badges: string[];              // 획득한 뱃지 목록
+  certificates: PointCertificate[]; // 인증서 목록
+}
+
+interface PointHistory {
+  type: 'earn' | 'spend' | 'deposit' | 'refund' | 'penalty';
+  amount: number;                // 양수: 획득, 음수: 차감
+  reason: string;                // 변동 사유
+  timestamp: string;             // ISO 8601
+}
+
+interface PointCertificate {
+  type: 'best_collaborator' | 'quality_star' | 'deadline_master';
+  projectName: string;
+  issuedAt: string;              // ISO 8601
+}
+
+interface PointPrediction {
+  memberId: string;
+  predictedChange: number;       // 예측 포인트 변동
+  warning: string | null;        // 경고 메시지 (차감 예상 시)
+  motivationMessage: string;     // 동기부여 메시지
+}
+
+interface SettlementResult {
+  settlements: {
+    memberId: string;
+    pointChange: number;
+    reason: string;
+    totalPoints: number;
+    badge: string | null;
+    certificate: PointCertificate | null;
+  }[];
+  bestCollaborator: {
+    memberId: string;
+    memberName: string;
+    certificate: PointCertificate;
+  };
+  aiComment: string;             // AI 종합 코멘트
+}
+
+type ExchangeItem = 'ai_matching' | 'cover_letter' | 'collaborator_badge';
+
+const EXCHANGE_COSTS: Record<ExchangeItem, number> = {
+  ai_matching: 20,               // AI 매칭 추천 1회
+  cover_letter: 15,              // 공모전 자소서 자동 생성 1회
+  collaborator_badge: 50,        // "우수 협업자" 인증 뱃지
+};
+```
+
 ### Context Reducer 액션 타입
 
 ```typescript
@@ -935,7 +994,12 @@ type TeamAction =
   | { type: 'APPROVE_REPORT' }
   | { type: 'SET_PPT_SLIDES'; payload: PPTSlide[] }
   | { type: 'ADD_MARKET_LISTING'; payload: MarketListing }
-  | { type: 'LOAD_FROM_STORAGE'; payload: Team };
+  | { type: 'LOAD_FROM_STORAGE'; payload: Team }
+  | { type: 'INIT_POINT_ACCOUNTS'; payload: PointAccount[] }
+  | { type: 'UPDATE_POINT_ACCOUNT'; payload: { memberId: string; updates: Partial<PointAccount> } }
+  | { type: 'ADD_POINT_EVENT'; payload: { memberId: string; event: PointHistory } }
+  | { type: 'SET_POINT_PREDICTIONS'; payload: PointPrediction[] }
+  | { type: 'SET_SETTLEMENT_RESULT'; payload: SettlementResult };
 
 interface AppliedChange {
   type: 'reassign_task' | 'extend_deadline' | 'reduce_scope' | 'add_task' | 'split_task';
@@ -950,6 +1014,9 @@ interface AppliedChange {
 |----|-----|------|
 | `ai-pm-agent-team` | `Team` JSON | 팀 전체 상태 |
 | `ai-pm-agent-market` | `MarketListing[]` JSON | 마켓플레이스 목록 |
+| `ai-pm-agent-points` | `PointAccount[]` JSON | 팀원별 포인트 계정 |
+| `ai-pm-agent-predictions` | `PointPrediction[]` JSON | AI 포인트 예측 결과 |
+| `ai-pm-agent-settlement` | `SettlementResult` JSON | 프로젝트 종료 정산 결과 |
 
 ### 엔티티 관계도
 
@@ -964,6 +1031,7 @@ erDiagram
     Team ||--o| Report : "has"
     
     Member ||--o{ Task : "assigned to"
+    Member ||--|| PointAccount : "has"
     Task ||--o| Review : "has"
     AISuggestion }o--|| Task : "related to"
     
@@ -971,5 +1039,10 @@ erDiagram
     Report ||--o{ PPTSlide : "has"
     
     Team ||--o| MarketListing : "listed as"
+    Team ||--o| SettlementResult : "settled by"
+    
+    PointAccount ||--o{ PointHistory : "has"
+    PointAccount ||--o{ PointCertificate : "has"
+    SettlementResult ||--|| PointCertificate : "awards best collaborator"
 ```
 
