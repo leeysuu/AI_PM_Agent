@@ -6,6 +6,7 @@ import LoadingOverlay from '../common/LoadingOverlay';
 import ErrorMessage from '../common/ErrorMessage';
 import { useTeamContext } from '../../context/TeamContext';
 import { createTeam } from '../../api/teamApi';
+import { usePoints } from '../../hooks/usePoints';
 import type { Member, Team } from '../../types/index';
 
 interface MemberInput {
@@ -46,6 +47,7 @@ function validate(projectName: string, deadline: string, members: MemberInput[])
 
 const TeamCreatePage: React.FC = () => {
   const { dispatch } = useTeamContext();
+  const { initializePoints } = usePoints();
 
   const [projectName, setProjectName] = useState('');
   const [topic, setTopic] = useState('');
@@ -121,10 +123,16 @@ const TeamCreatePage: React.FC = () => {
         aiSuggestions: [],
         alerts: [],
         report: null,
+        pointAccounts: [],
+        pointPredictions: [],
+        settlementResult: null,
         createdAt: new Date().toISOString(),
       };
 
       dispatch({ type: 'SET_TEAM', payload: team });
+
+      // 포인트 시스템 초기화 (100pt - 20pt 보증금 = 80pt)
+      initializePoints(finalMembers);
     } catch (err) {
       const message = err instanceof Error ? err.message : '팀 생성 중 오류가 발생했습니다.';
       setApiError(message);

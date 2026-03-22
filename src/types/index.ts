@@ -1,17 +1,10 @@
-<<<<<<< HEAD
-=======
 // types/index.ts — AI 조별과제 PM 에이전트 데이터 모델
 
->>>>>>> origin/main
 export interface Team {
   id: string;
   projectName: string;
   topic: string;
-<<<<<<< HEAD
-  deadline: string;
-=======
   deadline: string;              // ISO 8601 (YYYY-MM-DD)
->>>>>>> origin/main
   members: Member[];
   tasks: Task[];
   milestones: Milestone[];
@@ -19,11 +12,10 @@ export interface Team {
   aiSuggestions: AISuggestion[];
   alerts: Alert[];
   report: Report | null;
-<<<<<<< HEAD
-  createdAt: string;
-=======
+  pointAccounts: PointAccount[];
+  pointPredictions: PointPrediction[];
+  settlementResult: SettlementResult | null;
   createdAt: string;             // ISO 8601
->>>>>>> origin/main
 }
 
 export interface Member {
@@ -41,11 +33,7 @@ export interface Task {
   assigneeId: string;
   startDate: string;
   deadline: string;
-<<<<<<< HEAD
-  progress: number;
-=======
   progress: number;              // 0-100
->>>>>>> origin/main
   status: 'todo' | 'inProgress' | 'done';
   difficulty: '상' | '중' | '하';
   submittedContent: string | null;
@@ -146,18 +134,88 @@ export interface MarketListing {
   aiSummary: string;
   fullContent: string;
   reviewReport: Report;
-<<<<<<< HEAD
-  contributionData: { memberId: string; memberName: string; contribution: number }[];
-=======
   contributionData: {
     memberId: string;
     memberName: string;
     contribution: number;
   }[];
->>>>>>> origin/main
   salesCount: number;
   createdAt: string;
 }
+
+// ── 포인트 시스템 ──
+
+export type PointEventType =
+  | 'deposit'           // 보증금 차감
+  | 'submit'            // 결과물 제출 +5
+  | 'quality_bonus'     // 품질 80점 이상 +10
+  | 'early_submit'      // 마감 전 제출 +3
+  | 'accept_suggestion' // AI 제안 수락 후 실행 +5
+  | 'constructive'      // 건설적 의견 +2
+  | 'no_response'       // 3일 이상 무응답 -5
+  | 'overdue'           // 마감 초과 -10
+  | 'reject_streak'     // AI 제안 3회 연속 거절 -5
+  | 'settlement'        // 프로젝트 종료 정산
+  | 'exchange';         // 포인트 교환
+
+export interface PointEvent {
+  id: string;
+  memberId: string;
+  type: PointEventType;
+  amount: number;         // 양수=획득, 음수=차감
+  reason: string;
+  createdAt: string;
+}
+
+export interface PointCertificate {
+  type: 'best_collaborator' | 'quality_star' | 'deadline_master';
+  projectName: string;
+  issuedAt: string;       // ISO 8601
+}
+
+export interface PointAccount {
+  memberId: string;
+  balance: number;        // 현재 잔액
+  deposit: number;        // 보증금 (20pt)
+  history: PointEvent[];
+  badges: string[];       // 획득한 뱃지 목록
+  certificates: PointCertificate[]; // 인증서 목록
+}
+
+export interface PointPrediction {
+  memberId: string;
+  predictedChange: number;
+  warning: string | null;
+  motivationMessage: string;
+}
+
+export interface SettlementResult {
+  members: {
+    memberId: string;
+    pointChange: number;
+    reason: string;
+    totalPoints: number;
+    badge: string | null;
+    certificate: PointCertificate | null;
+  }[];
+  bestCollaborator: string;  // memberId
+  aiComment: string;
+}
+
+export interface ExchangeItem {
+  id: string;
+  name: string;
+  description: string;
+  cost: number;
+}
+
+export type ExchangeItemType = 'ai_matching' | 'cover_letter' | 'collaborator_badge';
+
+export const EXCHANGE_COSTS: Record<ExchangeItemType, number> = {
+  ai_matching: 20,
+  cover_letter: 15,
+  collaborator_badge: 50,
+};
 
 export interface AppliedChange {
   type: 'reassign_task' | 'extend_deadline' | 'reduce_scope' | 'add_task' | 'split_task';
@@ -179,4 +237,9 @@ export type TeamAction =
   | { type: 'APPROVE_REPORT' }
   | { type: 'SET_PPT_SLIDES'; payload: PPTSlide[] }
   | { type: 'ADD_MARKET_LISTING'; payload: MarketListing }
-  | { type: 'LOAD_FROM_STORAGE'; payload: Team };
+  | { type: 'LOAD_FROM_STORAGE'; payload: Team }
+  | { type: 'INIT_POINT_ACCOUNTS'; payload: PointAccount[] }
+  | { type: 'UPDATE_POINT_ACCOUNT'; payload: { memberId: string; updates: Partial<PointAccount> } }
+  | { type: 'ADD_POINT_EVENT'; payload: PointEvent }
+  | { type: 'SET_POINT_PREDICTIONS'; payload: PointPrediction[] }
+  | { type: 'SET_SETTLEMENT_RESULT'; payload: SettlementResult };

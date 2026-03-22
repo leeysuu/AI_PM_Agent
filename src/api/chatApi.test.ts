@@ -22,6 +22,9 @@ describe('analyzeChat', () => {
     aiSuggestions: [],
     alerts: [],
     report: null,
+    pointAccounts: [],
+    pointPredictions: [],
+    settlementResult: null,
     createdAt: '2025-01-01',
   };
 

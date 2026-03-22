@@ -1,7 +1,7 @@
 import React from 'react';
 import { calculateDDay } from '../../utils/dateUtils';
 
-const TABS = ['팀 생성', '대시보드', '채팅', '보고서', '마켓플레이스'] as const;
+const TABS = ['팀 생성', '대시보드', '채팅', '보고서', '포인트'] as const;
 
 interface HeaderProps {
   projectName: string;

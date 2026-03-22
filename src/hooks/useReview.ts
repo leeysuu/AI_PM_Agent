@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useTeamContext } from '../context/TeamContext';
 import { submitReview } from '../api/reviewApi';
+import { usePoints } from './usePoints';
 import type { Review, AISuggestion } from '../types/index';
 
 interface ReviewResult {
@@ -10,6 +11,7 @@ interface ReviewResult {
 
 export function useReview() {
   const { team, dispatch } = useTeamContext();
+  const { addPointEvent } = usePoints();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<ReviewResult | null>(null);
@@ -69,6 +71,23 @@ export function useReview() {
         });
 
         setLastResult({ review, reassignSuggestion: response.reassignSuggestion });
+
+        // 포인트 이벤트: 결과물 제출 +5pt
+        const task = team.tasks.find((t) => t.id === taskId);
+        const assigneeId = task?.assigneeId;
+        if (assigneeId && team.pointAccounts.length > 0) {
+          addPointEvent(assigneeId, 'submit', 5, '결과물 제출');
+
+          // 품질 80점 이상 +10pt
+          if (review.scores.total >= 80) {
+            addPointEvent(assigneeId, 'quality_bonus', 10, `품질 우수 (${review.scores.total}점)`);
+          }
+
+          // 마감 전 제출 +3pt
+          if (task && new Date().toISOString() <= task.deadline) {
+            addPointEvent(assigneeId, 'early_submit', 3, '마감 전 제출');
+          }
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : '리뷰 처리 중 오류가 발생했습니다.';
         setError(message);
@@ -76,7 +95,7 @@ export function useReview() {
         setLoading(false);
       }
     },
-    [team, dispatch],
+    [team, dispatch, addPointEvent],
   );
 
   return { loading, error, lastResult, submitWork };

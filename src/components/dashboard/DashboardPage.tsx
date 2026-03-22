@@ -5,6 +5,7 @@ import { AISuggestionPanel } from '../suggestion/AISuggestionPanel';
 import { AlertTimeline } from './AlertTimeline';
 import { KanbanBoard } from './KanbanBoard';
 import { MilestoneTimeline } from './MilestoneTimeline';
+import PointWidget from '../points/PointWidget';
 
 export function DashboardPage() {
   const { team } = useTeamContext();
@@ -59,6 +60,10 @@ export function DashboardPage() {
           </div>
           <span className="text-sm font-medium text-gray-700 shrink-0">{overallProgress}%</span>
         </div>
+
+        <div className="shrink-0">
+          <PointWidget />
+        </div>
       </header>
 
       {/* 메인 콘텐츠: 좌측 칸반보드 + 우측 제안패널/알림 */}
@@ -76,8 +81,10 @@ export function DashboardPage() {
           </section>
         </div>
 
-        {/* 우측: 제안 패널 + 알림 타임라인 */}
+        {/* 우측: 포인트 위젯 + 제안 패널 + 알림 타임라인 */}
         <aside className="w-80 shrink-0 flex flex-col gap-4">
+          <PointWidget />
+
           <div className="bg-white rounded-lg shadow p-4 flex-1 overflow-y-auto">
             <AISuggestionPanel
               suggestions={suggestions}

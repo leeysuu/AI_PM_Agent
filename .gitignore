@@ -107,6 +107,9 @@ dist
 # Docusaurus cache and generated files
 .docusaurus
 
+# Lambda build output
+deploy/dist/
+
 # Serverless directories
 .serverless/
 

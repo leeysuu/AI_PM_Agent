@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useTeamContext } from '../context/TeamContext';
+import { usePoints } from './usePoints';
 import type { AISuggestion } from '../types';
 import { processDecision } from '../api/decisionApi';
 
@@ -15,6 +16,7 @@ export interface UseAISuggestionReturn {
 
 export function useAISuggestion(): UseAISuggestionReturn {
   const { team, dispatch } = useTeamContext();
+  const { addPointEvent } = usePoints();
   const [processing, setProcessing] = useState(false);
 
   const suggestions = team?.aiSuggestions ?? [];
@@ -43,13 +45,22 @@ export function useAISuggestion(): UseAISuggestionReturn {
         if (result.appliedChanges && result.appliedChanges.length > 0) {
           dispatch({ type: 'APPLY_CHANGES', payload: result.appliedChanges });
         }
+
+        // 포인트: AI 제안 수락 후 실행 +5pt
+        const suggestion = suggestions.find((s) => s.id === suggestionId);
+        if (suggestion && team.pointAccounts.length > 0) {
+          const task = team.tasks.find((t) => t.id === suggestion.relatedTaskId);
+          if (task) {
+            addPointEvent(task.assigneeId, 'accept_suggestion', 5, 'AI 제안 수락 후 실행');
+          }
+        }
       } catch {
         // Error is silently handled; UI remains in current state
       } finally {
         setProcessing(false);
       }
     },
-    [team, dispatch],
+    [team, dispatch, suggestions, addPointEvent],
   );
 
   const rejectSuggestion = useCallback(
@@ -65,6 +76,14 @@ export function useAISuggestion(): UseAISuggestionReturn {
           type: 'UPDATE_SUGGESTION',
           payload: { id: suggestionId, status: 'rejected', rejectionReason: reason },
         });
+
+        // 포인트: AI 제안 3회 연속 거절 -5pt
+        if (team.pointAccounts.length > 0) {
+          const task = team.tasks.find((t) => t.id === suggestion.relatedTaskId);
+          if (task) {
+            addPointEvent(task.assigneeId, 'reject_streak', -5, 'AI 제안 3회 연속 거절');
+          }
+        }
         return;
       }
 
@@ -91,7 +110,7 @@ export function useAISuggestion(): UseAISuggestionReturn {
         setProcessing(false);
       }
     },
-    [team, dispatch, suggestions],
+    [team, dispatch, suggestions, addPointEvent],
   );
 
   return { suggestions, processing, maxRoundReached, acceptSuggestion, rejectSuggestion };

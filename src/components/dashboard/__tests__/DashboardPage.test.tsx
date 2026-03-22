@@ -55,6 +55,9 @@ function makeTeam(overrides: Partial<Team> = {}): Team {
     aiSuggestions: [],
     alerts: [],
     report: null,
+    pointAccounts: [],
+    pointPredictions: [],
+    settlementResult: null,
     createdAt: today.toISOString(),
     ...overrides,
   };

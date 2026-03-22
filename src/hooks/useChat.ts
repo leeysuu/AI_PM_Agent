@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useTeamContext } from '../context/TeamContext';
 import type { ChatMessage } from '../types';
 import { analyzeChat } from '../api/chatApi';
+import { usePoints } from './usePoints';
 
 export type AiDetection = NonNullable<ChatMessage['aiDetection']>;
 
@@ -14,6 +15,7 @@ export interface UseChatReturn {
 
 export function useChat(): UseChatReturn {
   const { team, dispatch } = useTeamContext();
+  const { addPointEvent } = usePoints();
   const [sending, setSending] = useState(false);
 
   const messages = team?.chatMessages ?? [];
@@ -69,6 +71,15 @@ export function useChat(): UseChatReturn {
           });
         }
 
+        // +2pt 건설적 의견 감지 시 포인트 부여
+        if (
+          result.detection &&
+          result.detection.type === 'decision' &&
+          result.detection.confidence >= 0.7
+        ) {
+          addPointEvent(senderId, 'constructive', 2, '건설적 의견 기여');
+        }
+
         // If AI should intervene (confidence >= 0.7) and aiResponse exists, add AI message
         if (result.shouldIntervene && result.aiResponse) {
           const aiMessage: ChatMessage = {
@@ -95,7 +106,7 @@ export function useChat(): UseChatReturn {
         setSending(false);
       }
     },
-    [team, dispatch],
+    [team, dispatch, addPointEvent],
   );
 
   return { messages, detections, sending, sendMessage };

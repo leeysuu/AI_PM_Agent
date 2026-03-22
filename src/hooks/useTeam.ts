@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useTeamContext } from '../context/TeamContext';
 import { createTeam as apiCreateTeam } from '../api/teamApi';
+import { usePoints } from './usePoints';
 import type { Team, Member, AppliedChange } from '../types/index';
 
 interface TeamCreateInput {
@@ -12,6 +13,7 @@ interface TeamCreateInput {
 
 export function useTeam() {
   const { team, dispatch } = useTeamContext();
+  const { initializePoints } = usePoints();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,10 +59,16 @@ export function useTeam() {
           aiSuggestions: [],
           alerts: [],
           report: null,
+          pointAccounts: [],
+          pointPredictions: [],
+          settlementResult: null,
           createdAt: new Date().toISOString(),
         };
 
         dispatch({ type: 'SET_TEAM', payload: newTeam });
+
+        // 포인트 계정 초기화 (100pt 시작, 20pt 보증금)
+        initializePoints(finalMembers);
       } catch (err) {
         const message = err instanceof Error ? err.message : '팀 생성 중 오류가 발생했습니다.';
         setError(message);

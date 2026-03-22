@@ -1,19 +1,14 @@
-<<<<<<< HEAD
-function App() {
-  return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <h1 className="text-3xl font-bold text-blue-600">
-        AI 조별과제 PM 에이전트
-      </h1>
-=======
 import { useState, useEffect, useRef } from 'react';
 import { TeamProvider, useTeamContext } from './context/TeamContext';
 import Header from './components/common/Header';
 import TeamCreatePage from './components/team/TeamCreatePage';
+import { DashboardPage } from './components/dashboard/DashboardPage';
+import ChatPage from './components/chat/ChatPage';
 import ReportPage from './components/report/ReportPage';
+import PointExchangePage from './components/points/PointExchangePage';
 import { useProactiveCheck } from './hooks/useProactiveCheck';
 
-type Tab = '팀 생성' | '대시보드' | '채팅' | '보고서' | '마켓플레이스';
+type Tab = '팀 생성' | '대시보드' | '채팅' | '보고서' | '포인트';
 
 const DEFAULT_PROJECT_NAME = 'AI PM 에이전트';
 const DEFAULT_DEADLINE = '2099-12-31';
@@ -51,13 +46,13 @@ function AppContent() {
       case '팀 생성':
         return <TeamCreatePage />;
       case '대시보드':
-        return <div className="p-6 text-gray-700">대시보드 페이지</div>;
+        return <DashboardPage />;
       case '채팅':
-        return <div className="p-6 text-gray-700">채팅 페이지</div>;
+        return <ChatPage />;
       case '보고서':
         return <ReportPage />;
-      case '마켓플레이스':
-        return <div className="p-6 text-gray-700">마켓플레이스 페이지</div>;
+      case '포인트':
+        return <PointExchangePage />;
     }
   };
 
@@ -72,13 +67,10 @@ function AppContent() {
       <main className="mx-auto max-w-7xl">
         {renderPage()}
       </main>
->>>>>>> origin/main
     </div>
   );
 }
 
-<<<<<<< HEAD
-=======
 function App() {
   return (
     <TeamProvider>
@@ -87,5 +79,4 @@ function App() {
   );
 }
 
->>>>>>> origin/main
 export default App;

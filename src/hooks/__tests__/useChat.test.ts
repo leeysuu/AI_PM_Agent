@@ -32,6 +32,9 @@ function makeTeam(overrides: Partial<Team> = {}): Team {
     aiSuggestions: [],
     alerts: [],
     report: null,
+    pointAccounts: [],
+    pointPredictions: [],
+    settlementResult: null,
     createdAt: '2025-01-01T00:00:00.000Z',
     ...overrides,
   };
@@ -104,12 +107,15 @@ describe('useChat', () => {
     });
 
     const addMessageActions = dispatchedActions.filter((a) => a.type === 'ADD_MESSAGE');
-    // Should have 2 ADD_MESSAGE: user message + AI message
-    expect(addMessageActions.length).toBe(2);
+    // Should have at least 2 ADD_MESSAGE: user message + AI message (+ optional point notification)
+    expect(addMessageActions.length).toBeGreaterThanOrEqual(2);
 
-    const aiMsg = (addMessageActions[1] as { type: 'ADD_MESSAGE'; payload: { sender: string; content: string } }).payload;
-    expect(aiMsg.sender).toBe('ai');
-    expect(aiMsg.content).toBe('📋 의사결정 감지: 프로젝트 방향 변경');
+    // Find the AI intervention message (not the point notification)
+    const aiMsg = addMessageActions.find(
+      (a) => (a as { payload: { sender: string; content: string } }).payload.content === '📋 의사결정 감지: 프로젝트 방향 변경'
+    );
+    expect(aiMsg).toBeTruthy();
+    expect((aiMsg as { payload: { sender: string } }).payload.sender).toBe('ai');
   });
 
   /**

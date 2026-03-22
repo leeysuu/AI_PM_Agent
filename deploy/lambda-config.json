@@ -1,0 +1,67 @@
+{
+  "region": "us-east-1",
+  "runtime": "nodejs20.x",
+  "timeout": 60,
+  "memorySize": 256,
+  "roleName": "SafeRole-{USERNAME}",
+  "apiName": "ai-pm-agent-api",
+  "stageName": "prod",
+  "lambdas": [
+    {
+      "name": "ai-pm-team",
+      "source": "lambda/team",
+      "route": "POST /api/team",
+      "method": "POST",
+      "path": "/api/team"
+    },
+    {
+      "name": "ai-pm-chat",
+      "source": "lambda/chat",
+      "route": "POST /api/chat",
+      "method": "POST",
+      "path": "/api/chat"
+    },
+    {
+      "name": "ai-pm-review",
+      "source": "lambda/review",
+      "route": "POST /api/review",
+      "method": "POST",
+      "path": "/api/review"
+    },
+    {
+      "name": "ai-pm-decision",
+      "source": "lambda/decision",
+      "route": "POST /api/decision",
+      "method": "POST",
+      "path": "/api/decision"
+    },
+    {
+      "name": "ai-pm-merge",
+      "source": "lambda/merge",
+      "route": "POST /api/merge",
+      "method": "POST",
+      "path": "/api/merge"
+    },
+    {
+      "name": "ai-pm-check",
+      "source": "lambda/check",
+      "route": "POST /api/check",
+      "method": "POST",
+      "path": "/api/check"
+    },
+    {
+      "name": "ai-pm-points-settle",
+      "source": "lambda/points-settle",
+      "route": "POST /api/points/settle",
+      "method": "POST",
+      "path": "/api/points/settle"
+    },
+    {
+      "name": "ai-pm-points-predict",
+      "source": "lambda/points-predict",
+      "route": "POST /api/points/predict",
+      "method": "POST",
+      "path": "/api/points/predict"
+    }
+  ]
+}

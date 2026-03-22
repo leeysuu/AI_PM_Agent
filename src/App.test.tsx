@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import App from './App';
 
 function mockToday(dateStr: string) {
@@ -29,35 +29,35 @@ describe('App', () => {
   it('defaults to 팀 생성 tab with placeholder content', () => {
     mockToday('2025-07-01');
     render(<App />);
-    expect(screen.getByText('팀 생성 페이지')).toBeTruthy();
+    expect(screen.getByText('새 프로젝트 만들기')).toBeTruthy();
   });
 
   it('switches to 대시보드 tab on click', () => {
     mockToday('2025-07-01');
     render(<App />);
     fireEvent.click(screen.getByText('대시보드'));
-    expect(screen.getByText('대시보드 페이지')).toBeTruthy();
+    expect(screen.getByText('팀을 먼저 생성해주세요')).toBeTruthy();
   });
 
   it('switches to 채팅 tab on click', () => {
     mockToday('2025-07-01');
     render(<App />);
     fireEvent.click(screen.getByText('채팅'));
-    expect(screen.getByText('채팅 페이지')).toBeTruthy();
+    expect(screen.getByText(/팀을 먼저 생성해 주세요/)).toBeTruthy();
   });
 
   it('switches to 보고서 tab on click', () => {
     mockToday('2025-07-01');
     render(<App />);
     fireEvent.click(screen.getByText('보고서'));
-    expect(screen.getByText('보고서 페이지')).toBeTruthy();
+    expect(screen.getByText(/팀을 먼저 생성해주세요/)).toBeTruthy();
   });
 
-  it('switches to 마켓플레이스 tab on click', () => {
+  it('switches to 포인트 tab on click', () => {
     mockToday('2025-07-01');
     render(<App />);
-    fireEvent.click(screen.getByText('마켓플레이스'));
-    expect(screen.getByText('마켓플레이스 페이지')).toBeTruthy();
+    fireEvent.click(screen.getByText('포인트'));
+    expect(screen.getByText(/팀을 먼저 생성해주세요/)).toBeTruthy();
   });
 
   it('shows team project name when team exists in localStorage', () => {
@@ -74,6 +74,9 @@ describe('App', () => {
       aiSuggestions: [],
       alerts: [],
       report: null,
+      pointAccounts: [],
+      pointPredictions: [],
+      settlementResult: null,
       createdAt: '2025-07-01',
     };
     localStorage.setItem('ai-pm-agent-team', JSON.stringify(team));
@@ -97,6 +100,9 @@ describe('App', () => {
       aiSuggestions: [],
       alerts: [],
       report: null,
+      pointAccounts: [],
+      pointPredictions: [],
+      settlementResult: null,
       createdAt: '2025-07-01',
     };
     localStorage.setItem('ai-pm-agent-team', JSON.stringify(team));
@@ -112,6 +118,6 @@ describe('App', () => {
     expect(screen.getByText('대시보드')).toBeTruthy();
     expect(screen.getByText('채팅')).toBeTruthy();
     expect(screen.getByText('보고서')).toBeTruthy();
-    expect(screen.getByText('마켓플레이스')).toBeTruthy();
+    expect(screen.getByText('포인트')).toBeTruthy();
   });
 });

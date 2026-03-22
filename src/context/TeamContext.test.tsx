@@ -19,6 +19,9 @@ function createMockTeam(overrides?: Partial<Team>): Team {
     aiSuggestions: [],
     alerts: [],
     report: null,
+    pointAccounts: [],
+    pointPredictions: [],
+    settlementResult: null,
     createdAt: '2025-01-01',
     ...overrides,
   };
