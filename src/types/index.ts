@@ -1,8 +1,17 @@
+<<<<<<< HEAD
+=======
+// types/index.ts — AI 조별과제 PM 에이전트 데이터 모델
+
+>>>>>>> origin/main
 export interface Team {
   id: string;
   projectName: string;
   topic: string;
+<<<<<<< HEAD
   deadline: string;
+=======
+  deadline: string;              // ISO 8601 (YYYY-MM-DD)
+>>>>>>> origin/main
   members: Member[];
   tasks: Task[];
   milestones: Milestone[];
@@ -10,7 +19,11 @@ export interface Team {
   aiSuggestions: AISuggestion[];
   alerts: Alert[];
   report: Report | null;
+<<<<<<< HEAD
   createdAt: string;
+=======
+  createdAt: string;             // ISO 8601
+>>>>>>> origin/main
 }
 
 export interface Member {
@@ -28,7 +41,11 @@ export interface Task {
   assigneeId: string;
   startDate: string;
   deadline: string;
+<<<<<<< HEAD
   progress: number;
+=======
+  progress: number;              // 0-100
+>>>>>>> origin/main
   status: 'todo' | 'inProgress' | 'done';
   difficulty: '상' | '중' | '하';
   submittedContent: string | null;
@@ -129,7 +146,15 @@ export interface MarketListing {
   aiSummary: string;
   fullContent: string;
   reviewReport: Report;
+<<<<<<< HEAD
   contributionData: { memberId: string; memberName: string; contribution: number }[];
+=======
+  contributionData: {
+    memberId: string;
+    memberName: string;
+    contribution: number;
+  }[];
+>>>>>>> origin/main
   salesCount: number;
   createdAt: string;
 }

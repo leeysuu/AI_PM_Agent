@@ -2,7 +2,7 @@
 
 ## Introduction
 
-대학생 조별과제를 AI가 자율적으로 관리하는 프로젝트 매니저 에이전트 웹 애플리케이션이다. 팀원은 팀 정보 입력, 채팅 및 결과물 제출, AI 제안 수락/거절 3가지만 수행하며, 역할 분배, 일정 관리, 품질 리뷰, 지연 감지, 재배분, 보고서 취합, PPT 생성 등 나머지 프로젝트 관리 업무는 AI PM 에이전트가 자율적으로 수행한다. 프로젝트 종료 후에는 완성된 과제를 마켓플레이스에 등록하여 수익화할 수 있다. 모든 AI 판단은 Amazon Bedrock Claude API 호출을 통해 이루어지며, 하드코딩된 분기 로직을 사용하지 않는다.
+대학생 조별과제를 AI가 자율적으로 관리하는 프로젝트 매니저 에이전트 웹 애플리케이션이다. 팀원은 팀 정보 입력, 채팅 및 결과물 제출, AI 제안 수락/거절 3가지만 수행하며, 역할 분배, 일정 관리, 품질 리뷰, 지연 감지, 재배분, 보고서 취합, PPT 생성 등 나머지 프로젝트 관리 업무는 AI PM 에이전트가 자율적으로 수행한다. 활동 포인트(Commitment Point) 시스템을 통해 팀플 참여 보증금을 걸고, AI가 활동량을 분석하여 포인트를 정산하며, 실시간 포인트 예측으로 무임승차를 억제한다. 프로젝트 종료 후에는 완성된 과제를 마켓플레이스에 등록하여 수익화할 수 있다. 모든 AI 판단은 Amazon Bedrock Claude API 호출을 통해 이루어지며, 하드코딩된 분기 로직을 사용하지 않는다.
 
 ## Glossary
 
@@ -30,6 +30,13 @@
 - **Actual_Progress**: AI_Quality_Reviewer의 리뷰 점수 기반으로 산정되는 실제 진행률 백분율
 - **Negotiation_Round**: AI_Negotiator가 대안을 제시하는 회차 (최대 3회)
 - **Team_State**: 팀원, 태스크, 마일스톤, 채팅, 제안 이력, 알림, 보고서 등 팀 전체 상태를 포함하는 데이터 객체
+- **Point_Account**: 각 팀원의 포인트 잔액, 보증금, 변동 이력, 뱃지, 인증서를 관리하는 데이터 구조
+- **AI_Point_Settler**: Bedrock Claude를 호출하여 프로젝트 종료 시 팀 전체 활동 데이터를 분석하고 포인트 정산 및 Best Collaborator를 선정하는 Lambda 함수 (POST /api/points/settle)
+- **AI_Point_Predictor**: Bedrock Claude를 호출하여 프로젝트 진행 중 포인트 변동을 예측하고 차감 예상 팀원에게 경고 메시지를 생성하는 Lambda 함수 (POST /api/points/predict)
+- **Commitment_Point**: 팀플 참여 보증금 및 활동 기반 보상/차감 포인트 시스템. 초기 100포인트 지급, 프로젝트 시작 시 20포인트 보증금 차감
+- **Best_Collaborator**: 프로젝트 종료 시 AI가 기여도 1위 팀원에게 부여하는 인증서. 프로필에 자동 표시된다
+- **Point_Widget**: 대시보드 상단에 표시되는 현재 포인트 잔액, 보증금, 최근 변동 내역을 보여주는 위젯 컴포넌트
+- **Settlement_Screen**: 프로젝트 종료 시 기여도 바 차트, 포인트 변동 내역, Best Collaborator 인증서, AI 코멘트를 표시하는 정산 화면 컴포넌트
 
 ## Requirements
 
@@ -260,3 +267,86 @@
 5. THE System SHALL PPT 생성에 reveal.js (CDN)를 사용한다
 6. THE System SHALL 외부 상태관리 라이브러리 없이 React Context와 useReducer만 사용한다
 7. THE System SHALL DynamoDB를 사용하지 않고 localStorage만 사용한다 (해커톤 MVP)
+
+### Requirement 20: 포인트 시스템 기본 구조
+
+**User Story:** As a 팀원, I want 활동 포인트 시스템을 통해 팀플 참여에 대한 보증금을 걸고 기여도에 따라 포인트를 정산받고 싶다, so that 무임승차를 억제하고 공정한 보상이 이루어진다.
+
+#### Acceptance Criteria
+
+1. WHEN 사용자가 최초 가입하면, THE System SHALL 해당 사용자의 Point_Account에 초기 잔액 100포인트를 지급한다
+2. WHEN 팀 프로젝트가 시작되면, THE System SHALL 각 참여 팀원의 Point_Account에서 보증금 20포인트를 차감하고 deposit 필드에 기록한다
+3. WHEN 프로젝트가 종료되면, THE AI_Point_Settler SHALL Bedrock Claude API를 호출하여 팀 전체 활동 데이터(결과물 품질 점수, 마감 준수율, 채팅 참여도, AI 제안 수락률)를 종합 분석하고 각 팀원의 기여도를 산출한다 (하드코딩된 정산 로직 없이 AI가 매번 동적으로 판단한다)
+4. WHEN 포인트 정산이 완료되면, THE AI_Point_Settler SHALL 기여도 상위 팀원에게 보증금 전액 반환과 보너스 포인트를 지급하고, 기여도 평균 팀원에게 보증금 전액을 반환하며, 기여도 하위 팀원에게 보증금 일부를 차감한다
+5. THE AI_Point_Settler SHALL 정산 결과를 팀원별 pointChange, reason, totalPoints, badge, certificate 형태로 반환한다
+
+### Requirement 21: 포인트 획득 이벤트
+
+**User Story:** As a 팀원, I want 결과물 제출, 높은 품질 점수, 마감 전 제출 등 긍정적 활동에 대해 포인트를 자동으로 획득하고 싶다, so that 적극적인 참여에 대한 보상을 받을 수 있다.
+
+#### Acceptance Criteria
+
+1. WHEN 팀원이 결과물을 제출하면, THE System SHALL 해당 팀원의 Point_Account에 5포인트를 자동 지급한다
+2. WHEN AI 품질 리뷰 점수가 80점 이상이면, THE System SHALL 해당 팀원의 Point_Account에 추가 10포인트를 자동 지급한다
+3. WHEN 팀원이 태스크 마감일 이전에 결과물을 제출하면, THE System SHALL 해당 팀원의 Point_Account에 추가 3포인트를 자동 지급한다
+4. WHEN 팀원이 AI 제안을 수락하고 실행하면, THE System SHALL 해당 팀원의 Point_Account에 5포인트를 자동 지급한다
+5. WHEN AI_Chat_Monitor가 팀원의 채팅 메시지를 건설적 의견으로 감지하면, THE System SHALL 해당 팀원의 Point_Account에 2포인트를 자동 지급한다
+6. WHEN 팀원이 Best_Collaborator로 선정되면, THE System SHALL 해당 팀원의 Point_Account에 20포인트를 자동 지급한다
+7. WHEN 포인트가 획득되면, THE System SHALL Team_Chat에 "🎉 [팀원명] +[포인트]pt 획득!" 형식의 자동 알림 메시지를 표시한다
+
+### Requirement 22: 포인트 차감 이벤트
+
+**User Story:** As a 팀원, I want 무응답, 마감 초과, AI 제안 연속 거절 등 부정적 활동에 대해 포인트가 자동으로 차감되길 원한다, so that 무임승차와 비협조적 행동이 억제된다.
+
+#### Acceptance Criteria
+
+1. WHEN 팀원의 태스크 마지막 업데이트로부터 3일 이상 경과하고 결과물이 미제출 상태이면, THE System SHALL 해당 팀원의 Point_Account에서 5포인트를 자동 차감한다
+2. WHEN 팀원이 태스크 마감일을 초과하면, THE System SHALL 해당 팀원의 Point_Account에서 10포인트를 자동 차감한다
+3. WHEN 팀원이 AI 제안을 3회 연속 거절하면, THE System SHALL 해당 팀원의 Point_Account에서 5포인트를 자동 차감한다
+4. WHEN 포인트가 차감되면, THE System SHALL Team_Chat에 "⚠️ [팀원명] -[포인트]pt 차감 ([차감 사유])" 형식의 자동 알림 메시지를 표시한다
+
+### Requirement 23: AI 실시간 포인트 예측
+
+**User Story:** As a 팀원, I want AI가 프로젝트 진행 중에 포인트 변동을 예측하고 차감 예상 팀원에게 미리 경고해 주길 원한다, so that 무임승차를 사전에 억제할 수 있다.
+
+#### Acceptance Criteria
+
+1. THE AI_Point_Predictor SHALL Bedrock Claude API를 호출하여 현재 팀 상태와 각 팀원의 포인트 현황을 분석하고 프로젝트 종료 시 포인트 변동을 예측한다 (하드코딩된 예측 로직 없이 AI가 매번 동적으로 판단한다)
+2. WHEN AI_Point_Predictor가 특정 팀원의 포인트 차감을 예측하면, THE AI_Point_Predictor SHALL 해당 팀원에게 경고 메시지와 개선 방안을 Team_Chat에 자동 전송한다
+3. THE AI_Point_Predictor SHALL 팀원별 predictedChange, warning, motivationMessage를 반환한다
+4. THE Dashboard SHALL 각 팀원 카드에 AI가 예측한 포인트 변동 정보를 표시한다
+
+### Requirement 24: AI 3단계 자율 사고 프로세스
+
+**User Story:** As a 개발자, I want AI가 포인트 시스템에서 "예측 → 행동 → 평가"를 자율적으로 수행하길 원한다, so that 에이전틱 AI의 자율 판단 능력이 극대화된다.
+
+#### Acceptance Criteria
+
+1. THE AI_Point_Predictor SHALL 1단계(예측)에서 Bedrock Claude API를 호출하여 현재 팀 상태를 분석하고 각 팀원의 포인트 변동을 예측한다
+2. THE AI_Point_Predictor SHALL 2단계(행동)에서 Bedrock Claude API를 호출하여 예측 결과를 기반으로 경고 메시지 전송, 동기부여 메시지 생성, 태스크 재배분 제안 등 적절한 행동을 자율적으로 결정하고 실행한다
+3. THE AI_Point_Settler SHALL 3단계(평가)에서 Bedrock Claude API를 호출하여 프로젝트 종료 시 실제 활동 데이터를 분석하고 최종 포인트를 정산한다
+4. THE System SHALL 3단계 모두 하드코딩된 분기 로직 없이 Bedrock Claude API 호출을 통해 AI가 자율적으로 판단하도록 한다
+
+### Requirement 25: 프로젝트 종료 정산 및 Best Collaborator 선정
+
+**User Story:** As a 팀원, I want 프로젝트 종료 시 AI가 팀 전체 활동을 분석하여 포인트를 정산하고 Best Collaborator를 선정해 주길 원한다, so that 공정한 평가와 인정을 받을 수 있다.
+
+#### Acceptance Criteria
+
+1. WHEN 프로젝트가 종료되면, THE AI_Point_Settler SHALL Bedrock Claude API를 호출하여 팀 전체 활동 데이터(결과물 품질, 마감 준수, 채팅 참여, AI 제안 수락률)를 종합 분석하고 각 팀원별 최종 기여도를 산출한다
+2. WHEN 기여도 산출이 완료되면, THE AI_Point_Settler SHALL 기여도 1위 팀원에게 Best_Collaborator 인증서를 발급한다
+3. WHEN Best_Collaborator 인증서가 발급되면, THE System SHALL 해당 팀원의 Point_Account certificates 배열에 인증서 정보(type, projectName, issuedAt)를 추가하고 프로필에 자동 표시한다
+4. WHEN 정산이 완료되면, THE System SHALL 정산 결과(기여도 바 차트, 포인트 변동 내역, Best Collaborator 인증서, AI 코멘트)를 Settlement_Screen에 표시한다
+5. WHEN 정산이 완료되면, THE System SHALL 정산 결과 요약을 Team_Chat에 자동 공유한다
+
+### Requirement 26: 포인트 교환 (프리미엄 기능)
+
+**User Story:** As a 팀원, I want 획득한 포인트를 AI 매칭 추천, 공모전 자소서 생성, 우수 협업자 뱃지 등 프리미엄 기능으로 교환하고 싶다, so that 포인트를 유용하게 활용할 수 있다.
+
+#### Acceptance Criteria
+
+1. THE System SHALL 포인트 교환 메뉴에서 AI 매칭 추천 1회(20포인트), 공모전 자소서 자동 생성 1회(15포인트), "우수 협업자" 인증 뱃지(50포인트) 교환 옵션을 제공한다
+2. WHEN 팀원이 교환을 요청하면, THE System SHALL 해당 팀원의 Point_Account 잔액이 교환 비용 이상인지 확인한다
+3. IF 포인트 잔액이 교환 비용 미만이면, THEN THE System SHALL 잔액 부족 메시지를 표시하고 교환을 차단한다
+4. WHEN 교환이 승인되면, THE System SHALL 해당 포인트를 Point_Account에서 차감하고 history에 spend 타입으로 기록한다
+5. THE System SHALL 결제 연동 없이 포인트 교환 UI만 제공한다 (MVP 범위)

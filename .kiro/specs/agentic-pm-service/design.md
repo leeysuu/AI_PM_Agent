@@ -4,13 +4,14 @@
 
 AI 조별과제 PM 에이전트는 대학생 조별과제를 AI가 자율적으로 관리하는 웹 애플리케이션이다. 팀원은 팀 정보 입력, 채팅 및 결과물 제출, AI 제안 수락/거절 3가지만 수행하며, 나머지 프로젝트 관리 업무(역할 분배, 일정 관리, 품질 리뷰, 지연 감지, 재배분, 보고서 취합, PPT 생성)는 AI PM 에이전트가 자율적으로 수행한다.
 
-모든 AI 판단은 Amazon Bedrock Claude API 호출을 통해 이루어지며, 하드코딩된 분기 로직을 사용하지 않는다. 프로젝트 종료 후에는 완성된 과제를 마켓플레이스에 등록하여 수익화할 수 있다.
+모든 AI 판단은 Amazon Bedrock Claude API 호출을 통해 이루어지며, 하드코딩된 분기 로직을 사용하지 않는다. 프로젝트 종료 후에는 완성된 과제를 마켓플레이스에 등록하여 수익화할 수 있다. 활동 포인트(Commitment Point) 시스템을 통해 팀플 참여 보증금을 걸고, AI가 활동량을 분석하여 포인트를 정산하며, 무임승차를 억제한다.
 
 ### 핵심 설계 원칙
 
 - **AI 자율 판단**: 모든 판단은 Bedrock Claude API 호출로 수행하며, if-else 하드코딩 분기를 사용하지 않는다
 - **단일 호출 연쇄 처리**: 결과물 리뷰 시 품질 평가 → 진행률 산정 → 지연 감지 → 재배분 제안을 단일 Bedrock 호출로 처리한다
 - **협상 루프**: AI 제안 거절 시 최대 3회까지 대안을 생성하며, 이전 이력을 참조하여 반복을 방지한다
+- **AI 3단계 자율 사고**: 포인트 시스템에서 "예측 → 행동 → 평가"를 AI가 자율적으로 수행한다 (모두 Bedrock 호출)
 - **해커톤 MVP**: localStorage 기반 영속성, 웹소켓 없이 React State + POST 호출 방식으로 채팅 구현
 
 ### 기술 스택
@@ -51,6 +52,8 @@ graph TB
         L4[POST /api/decision<br/>수락/거절 + 대안생성]
         L5[POST /api/merge<br/>보고서취합 + PPT생성]
         L6[GET /api/check<br/>자동점검 + 알림생성]
+        L7[POST /api/points/settle<br/>포인트정산 + Best Collaborator]
+        L8[POST /api/points/predict<br/>포인트예측 + 경고생성]
         BL[Bedrock 호출 레이어<br/>프롬프트 구성 + JSON 파싱 + 에러 핸들링]
     end
 
@@ -59,8 +62,8 @@ graph TB
     end
 
     UI -->|HTTPS| GW
-    GW --> L1 & L2 & L3 & L4 & L5 & L6
-    L1 & L2 & L3 & L4 & L5 & L6 --> BL
+    GW --> L1 & L2 & L3 & L4 & L5 & L6 & L7 & L8
+    L1 & L2 & L3 & L4 & L5 & L6 & L7 & L8 --> BL
     BL --> CLAUDE
 ```
 
@@ -154,6 +157,8 @@ sequenceDiagram
 1. **결과물 제출 연쇄** (POST /api/review): 품질 리뷰 → 진행률 산정 → 지연 감지 → 재배분 제안을 단일 Bedrock 호출로 처리
 2. **보고서 연쇄** (POST /api/merge): 전원 완료 감지 → 보고서 병합 → PPT 생성
 3. **협상 루프** (POST /api/decision): 제안 → 수락/거절 → 대안 생성 (최대 3회)
+4. **포인트 정산 연쇄** (POST /api/points/settle): 프로젝트 종료 → 활동 데이터 분석 → 기여도 산출 → 포인트 정산 → Best Collaborator 선정
+5. **포인트 예측 연쇄** (POST /api/points/predict): AI 자율 판단 → 포인트 변동 예측 → 경고/동기부여 메시지 생성
 
 #### 결과물 제출 4단계 연쇄 상세 흐름
 
@@ -287,6 +292,112 @@ sequenceDiagram
     CTX->>CTX: localStorage 자동 저장
 ```
 
+#### 포인트 정산 흐름 (POST /api/points/settle)
+
+```mermaid
+sequenceDiagram
+    participant FE as React 프론트엔드
+    participant CTX as Context + localStorage
+    participant API as API Gateway
+    participant LM as Lambda (POST /api/points/settle)
+    participant BR as Bedrock Claude
+
+    Note over FE,BR: 프로젝트 종료 시 AI가 팀 전체 활동 분석 → 포인트 정산
+    FE->>API: POST /api/points/settle {teamState}
+    API->>LM: 정산 요청
+
+    Note over LM,BR: AI 3단계 자율 사고 - 3단계(평가)
+    LM->>LM: 프롬프트 구성 (팀 전체 활동 데이터 포함)
+    LM->>BR: Bedrock 호출 (결과물 품질, 마감 준수율, 채팅 참여도, AI 제안 수락률 종합 분석)
+
+    Note over BR: 각 팀원별 기여도 산출
+    Note over BR: 기여도 상위: 보증금 반환 + 보너스
+    Note over BR: 기여도 평균: 보증금 전액 반환
+    Note over BR: 기여도 하위: 보증금 일부 차감
+    Note over BR: 기여도 1위 → Best Collaborator 선정
+
+    BR-->>LM: JSON {settlements[], bestCollaborator}
+    LM-->>API: 응답
+    API-->>FE: 팀원별 {pointChange, reason, totalPoints, badge, certificate}
+
+    FE->>CTX: dispatch(UPDATE_POINT_ACCOUNTS) — 포인트 정산 반영
+    FE->>CTX: dispatch(ADD_MESSAGE) — 정산 결과 채팅방 공유
+    CTX->>FE: Settlement_Screen 표시 (기여도 바 차트 + 포인트 변동 + 인증서)
+    CTX->>CTX: localStorage 자동 저장
+```
+
+#### AI 실시간 포인트 예측 흐름 (POST /api/points/predict)
+
+```mermaid
+sequenceDiagram
+    participant FE as React 프론트엔드
+    participant CTX as Context + localStorage
+    participant API as API Gateway
+    participant LM as Lambda (POST /api/points/predict)
+    participant BR as Bedrock Claude
+
+    Note over FE,BR: AI 3단계 자율 사고 - 1단계(예측) + 2단계(행동)
+    FE->>API: POST /api/points/predict {teamState, currentPoints}
+    API->>LM: 예측 요청
+
+    LM->>LM: 프롬프트 구성 (팀 상태 + 포인트 현황 포함)
+    LM->>BR: Bedrock 호출 (예측 → 행동을 자율적으로 판단)
+
+    Note over BR: 1단계(예측): 현재 상태로 종료 시 포인트 변동 예측
+    Note over BR: 2단계(행동): 차감 예상 팀원에게 경고 + 동기부여 메시지 생성
+
+    BR-->>LM: JSON {predictions[], warnings[], motivationMessages[]}
+    LM-->>API: 응답
+    API-->>FE: 팀원별 {predictedChange, warning, motivationMessage}
+
+    FE->>CTX: dispatch(SET_POINT_PREDICTIONS) — 예측 결과 저장
+    alt 차감 예상 팀원 존재
+        FE->>CTX: dispatch(ADD_MESSAGE) — 경고 메시지 채팅방 전송
+    end
+    CTX->>FE: 대시보드 팀원 카드에 포인트 예측 표시
+    CTX->>CTX: localStorage 자동 저장
+```
+
+#### 포인트 획득/차감 이벤트 흐름
+
+```mermaid
+sequenceDiagram
+    participant SYS as System (이벤트 감지)
+    participant CTX as Context + localStorage
+    participant FE as React 프론트엔드
+
+    Note over SYS,FE: 포인트 획득 이벤트 (자동 감지)
+    alt 결과물 제출
+        SYS->>CTX: dispatch(ADD_POINT_EVENT, {type: "earn", amount: 5})
+    else 품질 80점 이상
+        SYS->>CTX: dispatch(ADD_POINT_EVENT, {type: "earn", amount: 10})
+    else 마감 전 제출
+        SYS->>CTX: dispatch(ADD_POINT_EVENT, {type: "earn", amount: 3})
+    else AI 제안 수락 후 실행
+        SYS->>CTX: dispatch(ADD_POINT_EVENT, {type: "earn", amount: 5})
+    else 건설적 의견 감지
+        SYS->>CTX: dispatch(ADD_POINT_EVENT, {type: "earn", amount: 2})
+    else Best Collaborator 선정
+        SYS->>CTX: dispatch(ADD_POINT_EVENT, {type: "earn", amount: 20})
+    end
+
+    CTX->>FE: Point_Widget 업데이트
+    CTX->>FE: Team_Chat에 "🎉 A님 +Npt 획득!" 알림
+
+    Note over SYS,FE: 포인트 차감 이벤트 (자동 감지)
+    alt 3일 이상 무응답/미제출
+        SYS->>CTX: dispatch(ADD_POINT_EVENT, {type: "penalty", amount: -5})
+    else 마감 초과
+        SYS->>CTX: dispatch(ADD_POINT_EVENT, {type: "penalty", amount: -10})
+    else AI 제안 3회 연속 거절
+        SYS->>CTX: dispatch(ADD_POINT_EVENT, {type: "penalty", amount: -5})
+    end
+
+    CTX->>FE: Point_Widget 업데이트
+    CTX->>FE: Team_Chat에 "⚠️ A님 -Npt 차감 (사유)" 알림
+    CTX->>CTX: localStorage 자동 저장
+```
+
 
 ## Components and Interfaces
 
@@ -335,6 +446,17 @@ graph TB
     ReportPage --> PPTPreview
 
     App --> WorkSubmitModal
+
+    DashboardPage --> PointWidget
+    PointWidget --> PointBalance
+    PointWidget --> PointHistory
+
+    Routes --> SettlementScreen
+    SettlementScreen --> ContributionChart
+    SettlementScreen --> PointSettlementList
+    SettlementScreen --> BestCollaboratorCert
+
+    Routes --> PointExchangePage
 ```
 
 ### 파일 구조
@@ -373,6 +495,12 @@ src/
 │   ├── marketplace/             # 마켓플레이스
 │   │   ├── MarketplacePage.tsx  # 마켓 메인 페이지
 │   │   └── MarketListingCard.tsx # 과제 카드
+│   ├── points/                  # 포인트 시스템
+│   │   ├── PointWidget.tsx      # 대시보드 포인트 위젯 (잔액, 보증금, 최근 변동)
+│   │   ├── SettlementScreen.tsx # 프로젝트 종료 정산 화면
+│   │   ├── ContributionChart.tsx # 기여도 바 차트
+│   │   ├── BestCollaboratorCert.tsx # Best Collaborator 인증서
+│   │   └── PointExchangePage.tsx # 포인트 교환 페이지
 │   └── common/                  # 공통 컴포넌트
 │       ├── LoadingOverlay.tsx   # 로딩 오버레이
 │       ├── ErrorMessage.tsx     # 에러 메시지
@@ -384,6 +512,7 @@ src/
 │   ├── useTeam.ts               # 팀 상태 관리 훅
 │   ├── useChat.ts               # 채팅 로직 훅
 │   ├── useAISuggestion.ts       # AI 제안 관리 훅
+│   ├── usePoints.ts             # 포인트 시스템 관리 훅
 │   └── useLocalStorage.ts       # localStorage 동기화 훅
 ├── types/
 │   └── index.ts                 # TypeScript 인터페이스 정의
@@ -393,7 +522,9 @@ src/
 │   ├── reviewApi.ts             # POST /api/review
 │   ├── decisionApi.ts           # POST /api/decision
 │   ├── mergeApi.ts              # POST /api/merge
-│   └── checkApi.ts              # GET /api/check
+│   ├── checkApi.ts              # GET /api/check
+│   ├── pointsSettleApi.ts       # POST /api/points/settle
+│   └── pointsPredictApi.ts      # POST /api/points/predict
 ├── utils/
 │   ├── pptGenerator.ts          # reveal.js HTML 생성
 │   ├── dateUtils.ts             # 날짜 유틸리티
@@ -432,6 +563,20 @@ function useAISuggestion(): {
 
 // useLocalStorage - localStorage 동기화
 function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T) => void];
+
+// usePoints - 포인트 시스템 관리
+function usePoints(): {
+  pointAccounts: PointAccount[];
+  predictions: PointPrediction[];
+  settlementResult: SettlementResult | null;
+  loading: boolean;
+  initializePoints: (members: Member[]) => void;
+  depositPoints: (memberId: string, amount: number) => void;
+  addPointEvent: (memberId: string, type: PointHistoryType, amount: number, reason: string) => void;
+  settlePoints: (teamState: Team) => Promise<void>;
+  predictPoints: (teamState: Team) => Promise<void>;
+  exchangePoints: (memberId: string, item: ExchangeItem) => boolean;
+};
 ```
 
 ### API 호출 함수 인터페이스
@@ -499,6 +644,40 @@ async function runCheck(input: {
   alerts: Alert[];
   triggerMerge: boolean;
   aiChatMessage: string;
+}>;
+
+// api/pointsSettleApi.ts
+async function settlePoints(input: {
+  teamState: Team;
+  pointAccounts: PointAccount[];
+}): Promise<{
+  settlements: {
+    memberId: string;
+    pointChange: number;
+    reason: string;
+    totalPoints: number;
+    badge: string | null;
+    certificate: PointCertificate | null;
+  }[];
+  bestCollaborator: {
+    memberId: string;
+    memberName: string;
+    certificate: PointCertificate;
+  };
+  aiComment: string;
+}>;
+
+// api/pointsPredictApi.ts
+async function predictPoints(input: {
+  teamState: Team;
+  pointAccounts: PointAccount[];
+}): Promise<{
+  predictions: {
+    memberId: string;
+    predictedChange: number;
+    warning: string | null;
+    motivationMessage: string;
+  }[];
 }>;
 ```
 
@@ -739,6 +918,65 @@ interface MarketListing {
 }
 ```
 
+### 포인트 시스템 모델
+
+```typescript
+interface PointAccount {
+  memberId: string;
+  memberName: string;
+  balance: number;               // 현재 포인트 잔액
+  deposit: number;               // 보증금 (프로젝트 시작 시 20pt)
+  history: PointHistory[];       // 포인트 변동 이력
+  badges: string[];              // 획득한 뱃지 목록
+  certificates: PointCertificate[]; // 인증서 목록
+}
+
+interface PointHistory {
+  type: 'earn' | 'spend' | 'deposit' | 'refund' | 'penalty';
+  amount: number;                // 양수: 획득, 음수: 차감
+  reason: string;                // 변동 사유
+  timestamp: string;             // ISO 8601
+}
+
+interface PointCertificate {
+  type: 'best_collaborator' | 'quality_star' | 'deadline_master';
+  projectName: string;
+  issuedAt: string;              // ISO 8601
+}
+
+interface PointPrediction {
+  memberId: string;
+  predictedChange: number;       // 예측 포인트 변동
+  warning: string | null;        // 경고 메시지 (차감 예상 시)
+  motivationMessage: string;     // 동기부여 메시지
+}
+
+interface SettlementResult {
+  settlements: {
+    memberId: string;
+    pointChange: number;
+    reason: string;
+    totalPoints: number;
+    badge: string | null;
+    certificate: PointCertificate | null;
+  }[];
+  bestCollaborator: {
+    memberId: string;
+    memberName: string;
+    certificate: PointCertificate;
+  };
+  aiComment: string;             // AI 종합 코멘트
+}
+
+type ExchangeItem = 'ai_matching' | 'cover_letter' | 'collaborator_badge';
+
+const EXCHANGE_COSTS: Record<ExchangeItem, number> = {
+  ai_matching: 20,               // AI 매칭 추천 1회
+  cover_letter: 15,              // 공모전 자소서 자동 생성 1회
+  collaborator_badge: 50,        // "우수 협업자" 인증 뱃지
+};
+```
+
 ### Context Reducer 액션 타입
 
 ```typescript
@@ -756,7 +994,12 @@ type TeamAction =
   | { type: 'APPROVE_REPORT' }
   | { type: 'SET_PPT_SLIDES'; payload: PPTSlide[] }
   | { type: 'ADD_MARKET_LISTING'; payload: MarketListing }
-  | { type: 'LOAD_FROM_STORAGE'; payload: Team };
+  | { type: 'LOAD_FROM_STORAGE'; payload: Team }
+  | { type: 'INIT_POINT_ACCOUNTS'; payload: PointAccount[] }
+  | { type: 'UPDATE_POINT_ACCOUNT'; payload: { memberId: string; updates: Partial<PointAccount> } }
+  | { type: 'ADD_POINT_EVENT'; payload: { memberId: string; event: PointHistory } }
+  | { type: 'SET_POINT_PREDICTIONS'; payload: PointPrediction[] }
+  | { type: 'SET_SETTLEMENT_RESULT'; payload: SettlementResult };
 
 interface AppliedChange {
   type: 'reassign_task' | 'extend_deadline' | 'reduce_scope' | 'add_task' | 'split_task';
@@ -771,6 +1014,9 @@ interface AppliedChange {
 |----|-----|------|
 | `ai-pm-agent-team` | `Team` JSON | 팀 전체 상태 |
 | `ai-pm-agent-market` | `MarketListing[]` JSON | 마켓플레이스 목록 |
+| `ai-pm-agent-points` | `PointAccount[]` JSON | 팀원별 포인트 계정 |
+| `ai-pm-agent-predictions` | `PointPrediction[]` JSON | AI 포인트 예측 결과 |
+| `ai-pm-agent-settlement` | `SettlementResult` JSON | 프로젝트 종료 정산 결과 |
 
 ### 엔티티 관계도
 
@@ -785,6 +1031,7 @@ erDiagram
     Team ||--o| Report : "has"
     
     Member ||--o{ Task : "assigned to"
+    Member ||--|| PointAccount : "has"
     Task ||--o| Review : "has"
     AISuggestion }o--|| Task : "related to"
     
@@ -792,5 +1039,10 @@ erDiagram
     Report ||--o{ PPTSlide : "has"
     
     Team ||--o| MarketListing : "listed as"
+    Team ||--o| SettlementResult : "settled by"
+    
+    PointAccount ||--o{ PointHistory : "has"
+    PointAccount ||--o{ PointCertificate : "has"
+    SettlementResult ||--|| PointCertificate : "awards best collaborator"
 ```
 

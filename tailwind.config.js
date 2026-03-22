@@ -8,4 +8,8 @@ export default {
     extend: {},
   },
   plugins: [],
+<<<<<<< HEAD
 };
+=======
+}
+>>>>>>> origin/main
