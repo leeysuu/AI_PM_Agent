@@ -251,69 +251,149 @@ MVP 우선순위에 따라 핵심 기능부터 점진적으로 구현한다. 프
 - [ ] 11. Checkpoint - 확장 기능 통합 확인
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 12. [8순위] PPT 자동 생성
-  - [ ] 12.1 PPT 뷰어 UI 구현
+- [ ] 12. [8순위] 포인트 시스템 (정산 + 실시간 예측 + Best Collaborator)
+  - [ ] 12.1 포인트 시스템 TypeScript 데이터 모델 추가 (`src/types/index.ts`)
+    - PointAccount, PointHistory, PointCertificate, PointPrediction, SettlementResult, ExchangeItem 인터페이스 추가
+    - TeamAction 유니온 타입에 INIT_POINT_ACCOUNTS, UPDATE_POINT_ACCOUNT, ADD_POINT_EVENT, SET_POINT_PREDICTIONS, SET_SETTLEMENT_RESULT 액션 추가
+    - _Requirements: 20.1, 20.5_
+
+  - [ ] 12.2 포인트 시스템 Reducer 액션 구현 (`src/context/teamReducer.ts`)
+    - INIT_POINT_ACCOUNTS: 팀원별 초기 100포인트 PointAccount 생성
+    - UPDATE_POINT_ACCOUNT: 개별 팀원 포인트 계정 업데이트
+    - ADD_POINT_EVENT: 포인트 획득/차감 이벤트 기록 + 잔액 반영
+    - SET_POINT_PREDICTIONS: AI 포인트 예측 결과 저장
+    - SET_SETTLEMENT_RESULT: 프로젝트 종료 정산 결과 저장
+    - _Requirements: 20.1, 20.2, 21.1, 21.2, 21.3, 21.4, 21.5, 21.6, 22.1, 22.2, 22.3_
+
+  - [ ] 12.3 usePoints 커스텀 훅 구현 (`src/hooks/usePoints.ts`)
+    - `initializePoints(members)`: 팀원별 초기 100포인트 지급 + INIT_POINT_ACCOUNTS dispatch
+    - `depositPoints(memberId, amount)`: 보증금 20포인트 차감 + ADD_POINT_EVENT dispatch
+    - `addPointEvent(memberId, type, amount, reason)`: 포인트 획득/차감 + 채팅 알림 메시지 자동 생성
+    - `settlePoints(teamState)`: POST /api/points/settle 호출 → SET_SETTLEMENT_RESULT dispatch
+    - `predictPoints(teamState)`: POST /api/points/predict 호출 → SET_POINT_PREDICTIONS dispatch
+    - `exchangePoints(memberId, item)`: 잔액 확인 → 포인트 차감 + history 기록
+    - localStorage 동기화 (ai-pm-agent-points 키)
+    - _Requirements: 20.1, 20.2, 20.3, 20.4, 21.7, 22.4, 23.1, 23.2, 26.2, 26.3, 26.4_
+
+  - [ ] 12.4 포인트 획득/차감 이벤트 자동 감지 연동
+    - 결과물 제출 시 +5pt (useReview 훅 연동)
+    - 품질 점수 80점 이상 시 +10pt (리뷰 결과 처리 시)
+    - 마감 전 제출 시 +3pt (제출 시점 vs 태스크 마감일 비교)
+    - AI 제안 수락 후 실행 시 +5pt (useAISuggestion 훅 연동)
+    - 건설적 의견 감지 시 +2pt (AI_Chat_Monitor 응답 처리 시)
+    - 3일 이상 무응답/미제출 시 -5pt (AI_Proactive_Checker 연동)
+    - 마감 초과 시 -10pt (AI_Proactive_Checker 연동)
+    - AI 제안 3회 연속 거절 시 -5pt (useAISuggestion 훅 연동)
+    - 각 이벤트 발생 시 Team_Chat에 자동 알림 메시지 추가
+    - _Requirements: 21.1, 21.2, 21.3, 21.4, 21.5, 21.7, 22.1, 22.2, 22.3, 22.4_
+
+  - [ ] 12.5 POST /api/points/settle Lambda 함수 구현
+    - 입력: teamState 전체 + pointAccounts
+    - Bedrock 프롬프트: 팀 전체 활동 데이터(결과물 품질 점수, 마감 준수율, 채팅 참여도, AI 제안 수락률) 종합 분석
+    - AI가 각 팀원별 기여도 산출 → 포인트 정산 (상위: 보증금 반환 + 보너스, 평균: 전액 반환, 하위: 일부 차감)
+    - 기여도 1위 → Best Collaborator 인증서 발급
+    - 출력: 팀원별 { pointChange, reason, totalPoints, badge, certificate } + bestCollaborator + aiComment
+    - 하드코딩 금지 — AI가 매번 동적으로 판단
+    - _Requirements: 20.3, 20.4, 20.5, 24.3, 25.1, 25.2, 17.1, 17.2, 17.3_
+
+  - [ ] 12.6 POST /api/points/predict Lambda 함수 구현
+    - 입력: teamState + pointAccounts (현재 포인트 현황)
+    - Bedrock 프롬프트: AI 3단계 자율 사고 (1단계: 예측 + 2단계: 행동)
+    - AI가 현재 상태로 종료 시 포인트 변동 예측 + 차감 예상 팀원에게 경고/동기부여 메시지 생성
+    - 출력: 팀원별 { predictedChange, warning, motivationMessage }
+    - 하드코딩 금지 — AI가 매번 동적으로 판단
+    - _Requirements: 23.1, 23.2, 23.3, 24.1, 24.2, 24.4, 17.1, 17.2, 17.3_
+
+  - [ ] 12.7 포인트 위젯 UI 구현 (`src/components/points/PointWidget.tsx`)
+    - 대시보드 상단에 현재 포인트 잔액, 보증금, 최근 변동 내역 표시
+    - 각 팀원 카드에 AI 포인트 예측 표시
+    - _Requirements: 23.4_
+
+  - [ ] 12.8 프로젝트 종료 정산 화면 구현 (`src/components/points/SettlementScreen.tsx`)
+    - `src/components/points/ContributionChart.tsx`: 기여도 바 차트
+    - `src/components/points/BestCollaboratorCert.tsx`: Best Collaborator 인증서 표시
+    - 포인트 변동 내역 목록 + AI 코멘트 표시
+    - 정산 결과를 Team_Chat에 자동 공유
+    - _Requirements: 25.3, 25.4, 25.5_
+
+  - [ ] 12.9 포인트 교환 페이지 구현 (`src/components/points/PointExchangePage.tsx`)
+    - AI 매칭 추천 1회 (20pt), 공모전 자소서 자동 생성 1회 (15pt), "우수 협업자" 인증 뱃지 (50pt) 교환 옵션
+    - 잔액 부족 시 교환 차단 + 메시지 표시
+    - 결제 연동 없이 포인트 UI만 제공 (MVP)
+    - _Requirements: 26.1, 26.2, 26.3, 26.4, 26.5_
+
+  - [ ] 12.10 포인트 시스템 단위 테스트
+    - 초기 포인트 지급 (100pt) 테스트
+    - 보증금 차감 (20pt) 테스트
+    - 포인트 획득/차감 이벤트별 잔액 반영 테스트
+    - 포인트 교환 시 잔액 부족 차단 테스트
+    - 채팅 알림 메시지 생성 테스트
+    - _Requirements: 20.1, 20.2, 21.7, 22.4, 26.3_
+
+- [ ] 13. [9순위] PPT 자동 생성
+  - [ ] 13.1 PPT 뷰어 UI 구현
     - `src/components/report/PPTPreview.tsx`: reveal.js 기반 HTML 프레젠테이션 미리보기 + 다운로드 버튼
     - _Requirements: 13.3, 13.4_
 
-  - [ ] 12.2 PPT 생성 유틸리티 구현 (`src/utils/pptGenerator.ts`)
+  - [ ] 13.2 PPT 생성 유틸리티 구현 (`src/utils/pptGenerator.ts`)
     - PPTSlide[] → reveal.js HTML 문자열 변환
     - 슬라이드별: 제목 + 핵심 내용 + 키워드 + 발표자 노트
     - reveal.js CDN 링크 포함
     - _Requirements: 13.1, 13.2, 19.5_
 
-  - [ ] 12.3 보고서 승인 → PPT 생성 연동
+  - [ ] 13.3 보고서 승인 → PPT 생성 연동
     - APPROVE_REPORT dispatch 후 POST /api/merge 응답의 pptSlides 활용
     - SET_PPT_SLIDES dispatch → PPTPreview에 표시
     - _Requirements: 13.1_
 
-  - [ ] 12.4 PPT HTML 생성 유틸리티 단위 테스트
+  - [ ] 13.4 PPT HTML 생성 유틸리티 단위 테스트
     - reveal.js HTML 구조 검증 테스트
     - _Requirements: 13.2, 13.3_
 
-- [-] 13. [9순위] AI 능동적 알림
-  - [x] 13.1 GET /api/check Lambda 함수 구현
+- [-] 14. [10순위] AI 능동적 알림
+  - [x] 14.1 GET /api/check Lambda 함수 구현
     - Bedrock 호출: 마감 임박(D-3, D-1), 3일 이상 미업데이트 태스크, 전원 완료 여부 점검
     - 응답: alerts[], triggerMerge(boolean), aiChatMessage
     - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6, 17.1_
 
-  - [x] 13.2 능동적 알림 프론트엔드 연동
+  - [x] 14.2 능동적 알림 프론트엔드 연동
     - checkApi.runCheck() 호출 (수동 트리거 또는 페이지 로드 시)
     - ADD_ALERT dispatch → AlertTimeline에 표시
     - triggerMerge=true 시 보고서 병합 플로우 트리거
     - 독촉/축하 메시지 → Team_Chat에 AI 메시지로 추가
     - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5_
 
-  - [x] 13.3 알림 생성 및 표시 단위 테스트
+  - [x] 14.3 알림 생성 및 표시 단위 테스트
     - 알림 타입별 표시 테스트
     - _Requirements: 14.1, 14.2, 14.3_
 
-- [ ] 14. 최종 통합 및 배포 설정
-  - [ ] 14.1 전체 컴포넌트 통합 및 탭 네비게이션 완성
+- [ ] 15. 최종 통합 및 배포 설정
+  - [ ] 15.1 전체 컴포넌트 통합 및 탭 네비게이션 완성
     - 모든 페이지 간 전환 동작 확인
     - Context 상태가 모든 컴포넌트에 올바르게 전파되는지 확인
     - localStorage 저장/복원 전체 플로우 확인
     - _Requirements: 4.6, 4.7, 16.2, 16.3_
 
-  - [ ] 14.2 Lambda 함수 배포 설정
-    - 각 Lambda 함수 패키징 (6개 엔드포인트)
+  - [ ] 15.2 Lambda 함수 배포 설정
+    - 각 Lambda 함수 패키징 (8개 엔드포인트: 기존 6개 + points/settle + points/predict)
     - API Gateway REST 엔드포인트 매핑
     - Bedrock 접근 IAM 권한 설정
     - _Requirements: 19.2, 19.3_
 
-  - [ ] 14.3 AWS Amplify 프론트엔드 배포 설정
+  - [ ] 15.3 AWS Amplify 프론트엔드 배포 설정
     - `amplify.yml` 빌드 설정
     - 환경변수 (API_BASE_URL) 설정
     - _Requirements: 19.4_
 
-- [ ] 15. Final Checkpoint - 전체 통합 및 배포 확인
+- [ ] 16. Final Checkpoint - 전체 통합 및 배포 확인
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
 
 - Tasks marked with `*` are optional and can be skipped for faster MVP
-- MVP 우선순위: 1순위(팀생성+역할+일정) → 2순위(채팅+모니터링) → 3순위(리뷰연쇄) → 4순위(수락/거절+협상) → 5순위(대시보드) → 6순위(보고서) → 7순위(마켓) → 8순위(PPT) → 9순위(알림)
+- MVP 우선순위: 1순위(팀생성+역할+일정) → 2순위(채팅+모니터링) → 3순위(리뷰연쇄) → 4순위(수락/거절+협상) → 5순위(대시보드) → 6순위(보고서) → 7순위(마켓) → 8순위(포인트시스템) → 9순위(PPT) → 10순위(알림)
 - 모든 AI 판단은 Bedrock Claude API 호출로 수행하며 하드코딩 분기 없음 (Requirement 17)
 - 각 Lambda 함수는 동일한 패턴: 프롬프트 구성 → Bedrock 호출 → JSON 파싱 → 에러 핸들링
+- 포인트 시스템의 정산과 예측은 모두 Bedrock 호출로 수행하며, AI 3단계 자율 사고(예측→행동→평가)를 따른다
 - Checkpoints ensure incremental validation at key integration points
 
